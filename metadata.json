@@ -1,0 +1,7 @@
+{
+  "name": "DrywallCalc",
+  "description": "Calculadora profesional de materiales de construcción liviana en seco (drywall, perfiles, fijaciones y acabados).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

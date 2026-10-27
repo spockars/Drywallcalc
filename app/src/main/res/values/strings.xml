@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">DrywallCalc</string>
+    <string name="calc_title">Calculadora de Drywall</string>
+    <string name="wall_dimensions">Dimensiones del Muro</string>
+    <string name="wall_length">Largo del muro (metros)</string>
+    <string name="wall_height">Alto del muro (metros)</string>
+    <string name="wall_faces">Número de caras</string>
+    <string name="one_face">1 Cara (Revestimiento)</string>
+    <string name="two_faces">2 Caras (Divisorio)</string>
+    <string name="stud_spacing">Separación de parantes / postes</string>
+    <string name="insulation_title">Aislamiento acústico/térmico</string>
+    <string name="insulation_desc">Incluir lana de vidrio o lana mineral</string>
+    <string name="board_type">Tipo de placa</string>
+    <string name="waste_factor">Factor de desperdicio: 8%</string>
+    <string name="calculate_button">Calcular Materiales</string>
+    <string name="results_title">Lista de Materiales</string>
+    <string name="category_structure">Estructura Metálica</string>
+    <string name="category_boards">Placas de Yeso</string>
+    <string name="category_fasteners">Fijaciones y Tornillería</string>
+    <string name="category_finishing">Tratamiento de Juntas</string>
+    <string name="category_insulation">Aislamiento</string>
+</resources>
+
