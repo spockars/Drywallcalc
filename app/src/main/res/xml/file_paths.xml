@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Reportes PDF generados en cacheDir/reports -->
+    <cache-path name="reports" path="reports/" />
+    <!-- Por si en el futuro se guardan reportes persistentes -->
+    <files-path name="reports_files" path="reports/" />
+</paths>

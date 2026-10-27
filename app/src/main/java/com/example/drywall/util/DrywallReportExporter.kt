@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import com.example.drywall.domain.model.WallCalculationResult
+import com.example.drywall.domain.model.WallCost
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,7 +31,8 @@ object DrywallReportExporter {
         result: WallCalculationResult,
         projectName: String? = null,
         clientOrLocation: String? = null,
-        notes: String? = null
+        notes: String? = null,
+        cost: WallCost? = null
     ): String {
         val input = result.input
         val sb = StringBuilder()
@@ -102,6 +104,31 @@ object DrywallReportExporter {
                 sb.append("• `${req.material.code}` *${req.material.name}*\n")
                 sb.append("   👉 *${req.commercialQuantity} ${if (req.commercialQuantity == 1) req.unit.singularName else req.unit.pluralName}*\n")
                 sb.append("   _(${req.formulaExplanation})_\n")
+            }
+            sb.append("\n")
+        }
+
+        cost?.let { wallCost ->
+            sb.append("━━━━━━━━━━━━━━━━━━━━━━━━\n")
+            sb.append("💰 *COSTO DEL MURO:*\n")
+            wallCost.lines.forEach { line ->
+                if (line.isPriced) {
+                    sb.append(
+                        "• ${line.name}: ${line.commercialQuantity} ${line.unitLabel} × " +
+                            "${NumberFormatUtils.formatCurrencyCop(line.unitPrice)} = " +
+                            "*${NumberFormatUtils.formatCurrencyCop(line.subtotal)}*\n"
+                    )
+                } else {
+                    sb.append("• ${line.name}: _sin cotizar_\n")
+                }
+            }
+            sb.append(
+                "• *Subtotal materiales:* *${NumberFormatUtils.formatCurrencyCop(wallCost.materialsSubtotal)}*\n"
+            )
+            if (!wallCost.complete) {
+                sb.append(
+                    "• ⚠️ *Presupuesto incompleto:* faltan ${wallCost.missingPrices} insumo(s) por cotizar\n"
+                )
             }
             sb.append("\n")
         }

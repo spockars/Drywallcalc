@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.drywall.data.local.entity.ProjectWithCalculations
+import com.example.drywall.domain.model.LaborMode
 
 /**
  * Diálogo para guardar el cómputo actual.
@@ -183,6 +185,94 @@ fun SaveProjectDialog(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(if (existingMode) "Agregar muro" else "Guardar en SQLite")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+/**
+ * Diálogo de mano de obra de una obra: opcional, por m² o por valor global.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LaborDialog(
+    projectName: String,
+    enabled: Boolean,
+    mode: LaborMode,
+    amountInput: String,
+    onEnabledChange: (Boolean) -> Unit,
+    onModeChange: (LaborMode) -> Unit,
+    onAmountChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mano de obra — $projectName") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Incluir mano de obra",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Es opcional: si la dejas apagada, el presupuesto solo suma materiales.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = onEnabledChange,
+                        modifier = Modifier.testTag("labor_switch")
+                    )
+                }
+
+                if (enabled) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LaborMode.entries.forEach { candidate ->
+                            FilterChip(
+                                selected = mode == candidate,
+                                onClick = { onModeChange(candidate) },
+                                label = { Text(candidate.label) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = amountInput,
+                        onValueChange = onAmountChange,
+                        label = {
+                            Text(
+                                if (mode == LaborMode.PER_M2) "Valor por m²" else "Valor global"
+                            )
+                        },
+                        prefix = { Text("$ ") },
+                        suffix = { if (mode == LaborMode.PER_M2) Text("/m²") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("labor_amount_field")
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm, shape = RoundedCornerShape(10.dp)) {
+                Text("Guardar")
             }
         },
         dismissButton = {

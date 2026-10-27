@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.drywall.data.local.dao.ProjectDao
+import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.WallCalculationEntity
 import com.example.drywall.data.local.entity.WallOpeningEntity
@@ -22,9 +23,10 @@ import com.example.drywall.data.local.entity.WallOpeningEntity
     entities = [
         ProjectEntity::class,
         WallCalculationEntity::class,
-        WallOpeningEntity::class
+        WallOpeningEntity::class,
+        MaterialPriceEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class DrywallDatabase : RoomDatabase() {
@@ -126,8 +128,37 @@ abstract class DrywallDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migración 2 → 3.
+         *
+         * Agrega la configuración de mano de obra a cada obra (apagada por defecto) y crea el
+         * catálogo de precios unitarios. Las obras, muros, vanos y pintura de la versión 2
+         * quedan intactos: solo se agregan columnas con valor por defecto y una tabla nueva.
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `projects` ADD COLUMN `laborEnabled` INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE `projects` ADD COLUMN `laborMode` TEXT NOT NULL DEFAULT 'PER_M2'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `projects` ADD COLUMN `laborAmount` REAL NOT NULL DEFAULT 0.0"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `material_prices` (" +
+                        "`itemKey` TEXT NOT NULL, " +
+                        "`unitPrice` REAL NOT NULL, " +
+                        "`unitLabel` TEXT NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`itemKey`))"
+                )
+            }
+        }
+
         /** Todas las migraciones registradas, en orden. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         @Volatile
         private var INSTANCE: DrywallDatabase? = null

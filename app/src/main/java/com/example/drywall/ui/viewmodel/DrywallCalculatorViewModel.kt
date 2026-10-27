@@ -13,10 +13,22 @@ import com.example.drywall.domain.engine.CalculatorEngine
 import com.example.drywall.domain.model.DrywallBoardType
 import com.example.drywall.domain.model.OpeningType
 import com.example.drywall.data.local.entity.WallWithOpenings
+import com.example.drywall.data.mapper.ProjectBudgetView
+import com.example.drywall.data.mapper.toBudgetView
+import com.example.drywall.data.mapper.toLabor
+import com.example.drywall.domain.engine.ALL_DRYWALL_MATERIALS
+import com.example.drywall.domain.engine.CostCalculator
 import com.example.drywall.domain.engine.PaintCalculator
+import com.example.drywall.domain.model.LaborMode
 import com.example.drywall.domain.model.PaintProduct
+import com.example.drywall.domain.model.PaintRole
 import com.example.drywall.domain.model.PaintSpec
 import com.example.drywall.domain.model.PaintUnit
+import com.example.drywall.domain.model.PriceCatalogItem
+import com.example.drywall.domain.model.PriceEntry
+import com.example.drywall.domain.model.PriceKeys
+import com.example.drywall.domain.model.ProjectLabor
+import com.example.drywall.domain.model.WallCost
 import com.example.drywall.domain.model.WallOpening
 import com.example.drywall.util.NumberFormatUtils
 import com.example.drywall.domain.model.MaterialCategory
@@ -36,7 +48,8 @@ import kotlinx.coroutines.launch
 enum class AppScreen(val label: String) {
     PROJECTS("Proyectos"),
     CALCULATOR("Calculadora"),
-    RESULTS("Resultados")
+    RESULTS("Resultados"),
+    PRICES("Precios")
 }
 
 /**
@@ -72,6 +85,16 @@ data class DrywallCalculatorUiState(
     val paintFinishCoatsInput: String = "2",
     val paintWastePercentInput: String = "10",
     val paintValidationErrors: List<String> = emptyList(),
+    // Costos y presupuesto
+    val priceCatalog: List<PriceCatalogItem> = emptyList(),
+    val prices: Map<String, PriceEntry> = emptyMap(),
+    val priceDrafts: Map<String, String> = emptyMap(),
+    val currentWallCost: WallCost? = null,
+    val projectBudgets: Map<Long, ProjectBudgetView> = emptyMap(),
+    val laborProjectId: Long? = null,
+    val laborEnabledDraft: Boolean = false,
+    val laborModeDraft: LaborMode = LaborMode.PER_M2,
+    val laborAmountDraft: String = "",
     val calculationResult: WallCalculationResult? = null,
     val selectedCategoryFilter: MaterialCategory? = null,
     val errorMessage: String? = null,
@@ -101,10 +124,188 @@ class DrywallCalculatorViewModel(
 
     init {
         // Cálculo inicial reactivo
+        _uiState.update { it.copy(priceCatalog = buildPriceCatalog()) }
         calculateMaterials()
 
         // Observa proyectos guardados desde Room si el repositorio está provisto
         observeSavedProjects()
+        observePrices()
+    }
+
+    /** Catálogo de insumos cotizables, con su unidad comercial. */
+    private fun buildPriceCatalog(): List<PriceCatalogItem> {
+        val materials = ALL_DRYWALL_MATERIALS.map { material ->
+            PriceCatalogItem(
+                itemKey = PriceKeys.material(material.id),
+                name = material.name,
+                unitLabel = material.defaultUnit.singularName,
+                categoryLabel = material.category.displayName
+            )
+        }
+        val paint = PaintRole.entries.flatMap { role ->
+            PaintUnit.entries.map { unit ->
+                PriceCatalogItem(
+                    itemKey = PriceKeys.paint(role, unit),
+                    name = "Pintura ${role.label.lowercase()}",
+                    unitLabel = unit.label.lowercase(),
+                    categoryLabel = "Pintura"
+                )
+            }
+        }
+        return materials + paint
+    }
+
+    private fun observePrices() {
+        val repo = repository ?: return
+        viewModelScope.launch {
+            repo.materialPrices
+                .catch { error ->
+                    _uiState.update {
+                        it.copy(userNotification = "Error al leer precios: ${error.localizedMessage}")
+                    }
+                }
+                .collect { entries ->
+                    val map = entries.associateBy { it.itemKey }
+                    _uiState.update { state ->
+                        val seeded = state.priceDrafts.toMutableMap()
+                        map.forEach { (key, entry) ->
+                            if (!seeded.containsKey(key)) {
+                                seeded[key] = if (entry.unitPrice > 0.0) {
+                                    NumberFormatUtils.formatDecimal(entry.unitPrice, 0)
+                                } else {
+                                    ""
+                                }
+                            }
+                        }
+                        state.copy(prices = map, priceDrafts = seeded)
+                    }
+                    recomputeCosts()
+                }
+        }
+    }
+
+    /** Recalcula costo del muro en pantalla y presupuesto de cada obra con los precios vigentes. */
+    private fun recomputeCosts() {
+        val state = _uiState.value
+        val wallCost = state.calculationResult?.let { result ->
+            CostCalculator.buildWallCost(result, state.prices)
+        }
+        val budgets = state.savedProjects.associate { project ->
+            project.project.id to project.toBudgetView(engine, state.prices)
+        }
+        _uiState.update { it.copy(currentWallCost = wallCost, projectBudgets = budgets) }
+    }
+
+    /** Actualiza el texto de un precio sin guardarlo todavía. */
+    fun onPriceDraftChanged(itemKey: String, value: String) {
+        _uiState.update { it.copy(priceDrafts = it.priceDrafts + (itemKey to value)) }
+    }
+
+    /** Limpia un precio (lo deja sin cotizar). */
+    fun onPriceCleared(itemKey: String) {
+        _uiState.update { it.copy(priceDrafts = it.priceDrafts + (itemKey to "")) }
+    }
+
+    /** Guarda en Room todo el catálogo de precios. */
+    fun savePrices() {
+        val repo = repository
+        if (repo == null) {
+            _uiState.update { it.copy(userNotification = "Persistencia no configurada en este entorno.") }
+            return
+        }
+
+        val state = _uiState.value
+        val entries = state.priceCatalog.map { item ->
+            val raw = state.priceDrafts[item.itemKey].orEmpty().replace(',', '.').trim()
+            val price = raw.toDoubleOrNull() ?: 0.0
+            PriceEntry(
+                itemKey = item.itemKey,
+                unitPrice = if (price > 0.0) price else 0.0,
+                unitLabel = item.unitLabel
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                repo.saveMaterialPrices(entries)
+                _uiState.update {
+                    it.copy(userNotification = "Precios unitarios guardados")
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(userNotification = "Error al guardar precios: ${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
+    /** Abre la edición de mano de obra de una obra. */
+    fun openLaborDialog(projectId: Long) {
+        val project = _uiState.value.savedProjects.firstOrNull { it.project.id == projectId }
+            ?: return
+        val labor = project.toLabor()
+        _uiState.update {
+            it.copy(
+                laborProjectId = projectId,
+                laborEnabledDraft = labor.enabled,
+                laborModeDraft = labor.mode,
+                laborAmountDraft = if (labor.amount > 0.0) {
+                    NumberFormatUtils.formatDecimal(labor.amount, 0)
+                } else {
+                    ""
+                }
+            )
+        }
+    }
+
+    fun dismissLaborDialog() {
+        _uiState.update { it.copy(laborProjectId = null) }
+    }
+
+    fun onLaborEnabledChanged(enabled: Boolean) {
+        _uiState.update { it.copy(laborEnabledDraft = enabled) }
+    }
+
+    fun onLaborModeChanged(mode: LaborMode) {
+        _uiState.update { it.copy(laborModeDraft = mode) }
+    }
+
+    fun onLaborAmountChanged(value: String) {
+        _uiState.update { it.copy(laborAmountDraft = value) }
+    }
+
+    /** Guarda la mano de obra de la obra abierta en el diálogo. */
+    fun saveLabor() {
+        val projectId = _uiState.value.laborProjectId ?: return
+        val repo = repository
+        if (repo == null) {
+            _uiState.update { it.copy(userNotification = "Persistencia no configurada en este entorno.") }
+            return
+        }
+
+        val state = _uiState.value
+        val amount = state.laborAmountDraft.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+        val labor = ProjectLabor(
+            enabled = state.laborEnabledDraft,
+            mode = state.laborModeDraft,
+            amount = if (amount > 0.0) amount else 0.0
+        )
+
+        viewModelScope.launch {
+            try {
+                repo.updateProjectLabor(projectId, labor)
+                _uiState.update {
+                    it.copy(
+                        laborProjectId = null,
+                        userNotification = "Mano de obra actualizada"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(userNotification = "Error al guardar mano de obra: ${e.localizedMessage}")
+                }
+            }
+        }
     }
 
     private fun observeSavedProjects() {
@@ -117,6 +318,7 @@ class DrywallCalculatorViewModel(
                 }
                 .collect { projects ->
                     _uiState.update { it.copy(savedProjects = projects) }
+                    recomputeCosts()
                 }
         }
     }
@@ -621,6 +823,7 @@ class DrywallCalculatorViewModel(
                     paintValidationErrors = paintErrors
                 )
             }
+            recomputeCosts()
         } catch (e: Exception) {
             _uiState.update {
                 it.copy(

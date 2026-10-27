@@ -219,7 +219,11 @@ fun PaintSummaryCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Pintura: ${estimate.productName.ifBlank { "producto sin nombre" }}",
+                    text = if (estimate.productName.isBlank()) {
+                        "Pintura del muro"
+                    } else {
+                        "Pintura: ${estimate.productName}"
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
@@ -77,8 +78,10 @@ import com.example.drywall.domain.model.WallCalculationResult
 import com.example.drywall.ui.components.PaintSummaryCard
 import com.example.drywall.ui.components.SaveProjectDialog
 import com.example.drywall.ui.components.ShareReportDialog
+import com.example.drywall.ui.components.WallCostCard
 import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
+import com.example.drywall.util.DrywallPdfExporter
 import com.example.drywall.util.NumberFormatUtils
 import kotlin.math.roundToInt
 
@@ -136,6 +139,31 @@ fun CalculationResultsScreen(
                             modifier = Modifier.testTag("share_whatsapp_top_button")
                         ) {
                             Icon(Icons.Default.Share, contentDescription = "Compartir por WhatsApp")
+                        }
+                        IconButton(
+                            onClick = {
+                                try {
+                                    val file = DrywallPdfExporter.generateWallPdf(
+                                        context = context,
+                                        result = res,
+                                        cost = uiState.currentWallCost
+                                    )
+                                    DrywallPdfExporter.sharePdf(
+                                        context = context,
+                                        file = file,
+                                        subject = "Reporte de materiales DrywallCalc"
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "No se pudo generar el PDF: ${e.localizedMessage}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            modifier = Modifier.testTag("share_pdf_top_button")
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = "Compartir PDF")
                         }
                         IconButton(
                             onClick = { copyResultToClipboard(context, res) },
@@ -198,6 +226,19 @@ fun CalculationResultsScreen(
                     }
                 }
 
+                // Desglose de costo del muro (cantidad comercial × precio unitario)
+                val wallCost = uiState.currentWallCost
+                if (wallCost != null) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            WallCostCard(
+                                cost = wallCost,
+                                onConfigurePrices = { viewModel.navigateTo(AppScreen.PRICES) }
+                            )
+                        }
+                    }
+                }
+
                 // Filtro por Categoría de Materiales
                 item {
                     Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
@@ -228,6 +269,7 @@ fun CalculationResultsScreen(
     if (showShareDialog && result != null) {
         ShareReportDialog(
             result = result,
+            cost = uiState.currentWallCost,
             onDismiss = { showShareDialog = false }
         )
     }
@@ -559,7 +601,7 @@ fun MaterialDetailCard(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "Comercial: ${requirement.commercialQuantity} ${requirement.unit.symbol}",
+                    text = "Comercial: ${requirement.commercialQuantity} ${requirement.unitLabel}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold

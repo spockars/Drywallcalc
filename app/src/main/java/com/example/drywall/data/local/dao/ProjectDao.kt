@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
+import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.WallCalculationEntity
 import com.example.drywall.data.local.entity.WallOpeningEntity
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +53,27 @@ interface ProjectDao {
 
     @Query("UPDATE projects SET updatedAt = :updatedAt WHERE id = :projectId")
     suspend fun touchProject(projectId: Long, updatedAt: Long)
+
+    @Query(
+        "UPDATE projects SET laborEnabled = :enabled, laborMode = :mode, " +
+            "laborAmount = :amount, updatedAt = :updatedAt WHERE id = :projectId"
+    )
+    suspend fun updateProjectLabor(
+        projectId: Long,
+        enabled: Boolean,
+        mode: String,
+        amount: Double,
+        updatedAt: Long
+    )
+
+    @Query("SELECT * FROM material_prices")
+    fun observeMaterialPrices(): Flow<List<MaterialPriceEntity>>
+
+    @Query("SELECT * FROM material_prices")
+    suspend fun getMaterialPrices(): List<MaterialPriceEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMaterialPrices(prices: List<MaterialPriceEntity>)
 
     @Query("SELECT * FROM wall_calculations WHERE projectId = :projectId ORDER BY createdAt DESC")
     fun getCalculationsByProjectId(projectId: Long): Flow<List<WallCalculationEntity>>

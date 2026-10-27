@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -59,10 +60,15 @@ import com.example.drywall.data.local.entity.ProjectWithCalculations
 import com.example.drywall.data.local.entity.WallCalculationEntity
 import com.example.drywall.data.local.entity.effectiveNetAreaM2
 import com.example.drywall.data.local.entity.totalPaintUnits
+import com.example.drywall.data.mapper.ProjectBudgetView
+import com.example.drywall.ui.components.BudgetSummary
+import com.example.drywall.ui.components.LaborDialog
 import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 import com.example.drywall.util.DrywallReportExporter
+import com.example.drywall.util.DrywallPdfExporter
 import com.example.drywall.util.NumberFormatUtils
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +81,7 @@ fun ProjectsListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    val context = LocalContext.current
 
     val filteredProjects = remember(uiState.savedProjects, uiState.searchQuery) {
         if (uiState.searchQuery.isBlank()) {
@@ -140,6 +147,33 @@ fun ProjectsListScreen(
                             onDeleteCalculation = { wall ->
                                 viewModel.setCalculationPendingDelete(wall)
                             },
+                            budgetView = uiState.projectBudgets[projectWithCalcs.project.id],
+                            onConfigureLabor = {
+                                viewModel.openLaborDialog(projectWithCalcs.project.id)
+                            },
+                            onSharePdf = {
+                                try {
+                                    val file = DrywallPdfExporter.generateProjectPdf(
+                                        context = context,
+                                        project = projectWithCalcs.project,
+                                        walls = projectWithCalcs.calculations.map {
+                                            projectWithCalcs.toWallWithOpenings(it)
+                                        },
+                                        budgetView = uiState.projectBudgets[projectWithCalcs.project.id]
+                                    )
+                                    DrywallPdfExporter.sharePdf(
+                                        context = context,
+                                        file = file,
+                                        subject = "Presupuesto ${projectWithCalcs.project.name}"
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "No se pudo generar el PDF: ${e.localizedMessage}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
                             onDeleteClick = {
                                 viewModel.setProjectPendingDelete(projectWithCalcs)
                             }
@@ -148,6 +182,23 @@ fun ProjectsListScreen(
                 }
             }
         }
+    }
+
+    uiState.laborProjectId?.let { projectId ->
+        val projectName = uiState.savedProjects
+            .firstOrNull { it.project.id == projectId }
+            ?.project?.name ?: "Obra"
+        LaborDialog(
+            projectName = projectName,
+            enabled = uiState.laborEnabledDraft,
+            mode = uiState.laborModeDraft,
+            amountInput = uiState.laborAmountDraft,
+            onEnabledChange = viewModel::onLaborEnabledChanged,
+            onModeChange = viewModel::onLaborModeChanged,
+            onAmountChange = viewModel::onLaborAmountChanged,
+            onDismiss = viewModel::dismissLaborDialog,
+            onConfirm = viewModel::saveLabor
+        )
     }
 
     uiState.calculationPendingDelete?.let { wallToDelete ->
@@ -312,6 +363,9 @@ fun ProjectCard(
     dateFormat: SimpleDateFormat,
     onLoadCalculation: (WallCalculationEntity) -> Unit,
     onDeleteCalculation: (WallCalculationEntity) -> Unit,
+    budgetView: ProjectBudgetView?,
+    onConfigureLabor: () -> Unit,
+    onSharePdf: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     ElevatedCard(
@@ -491,6 +545,30 @@ fun ProjectCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            budgetView?.let { view ->
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                BudgetSummary(
+                    budget = view.budget,
+                    laborConfigured = view.labor.isConfigured,
+                    onConfigureLabor = onConfigureLabor
+                )
+                OutlinedButton(
+                    onClick = onSharePdf,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("project_pdf_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("PDF de la obra")
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

@@ -1,12 +1,17 @@
 package com.example.drywall.data.repository
 
 import com.example.drywall.data.local.dao.ProjectDao
+import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
 import com.example.drywall.data.mapper.toEntity
 import com.example.drywall.data.mapper.toOpeningEntities
+import com.example.drywall.data.mapper.toDomain
+import com.example.drywall.domain.model.PriceEntry
+import com.example.drywall.domain.model.ProjectLabor
 import com.example.drywall.domain.model.WallCalculationResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Repositorio para abstraer el acceso a datos locales de proyectos y cómputos de Drywall.
@@ -29,6 +34,15 @@ interface DrywallRepository {
     suspend fun updateProject(project: ProjectEntity)
     suspend fun deleteProject(projectId: Long)
     suspend fun deleteCalculation(calculationId: Long)
+
+    /** Catálogo de precios unitarios vigente. */
+    val materialPrices: Flow<List<PriceEntry>>
+
+    /** Guarda (o actualiza) precios unitarios. */
+    suspend fun saveMaterialPrices(prices: List<PriceEntry>)
+
+    /** Actualiza la mano de obra de una obra. */
+    suspend fun updateProjectLabor(projectId: Long, labor: ProjectLabor)
 }
 
 /**
@@ -98,6 +112,27 @@ class DrywallRepositoryImpl(
 
     override suspend fun deleteCalculation(calculationId: Long) {
         projectDao.deleteCalculationById(calculationId)
+    }
+
+    override val materialPrices: Flow<List<PriceEntry>> =
+        projectDao.observeMaterialPrices().map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun saveMaterialPrices(prices: List<PriceEntry>) {
+        if (prices.isEmpty()) return
+        val now = System.currentTimeMillis()
+        projectDao.upsertMaterialPrices(
+            prices.map { it.copy(updatedAt = now).toEntity() }
+        )
+    }
+
+    override suspend fun updateProjectLabor(projectId: Long, labor: ProjectLabor) {
+        projectDao.updateProjectLabor(
+            projectId = projectId,
+            enabled = labor.enabled,
+            mode = labor.mode.name,
+            amount = labor.amount,
+            updatedAt = System.currentTimeMillis()
+        )
     }
 
     private suspend fun insertWall(

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.drywall.domain.model.WallCalculationResult
+import com.example.drywall.domain.model.WallCost
 import com.example.drywall.util.DrywallReportExporter
 
 /**
@@ -45,6 +46,7 @@ import com.example.drywall.util.DrywallReportExporter
 @Composable
 fun ShareReportDialog(
     result: WallCalculationResult,
+    cost: WallCost? = null,
     projectName: String? = null,
     clientOrLocation: String? = null,
     onDismiss: () -> Unit
@@ -53,7 +55,8 @@ fun ShareReportDialog(
     val reportText = DrywallReportExporter.generateWhatsAppFormattedReport(
         result = result,
         projectName = projectName,
-        clientOrLocation = clientOrLocation
+        clientOrLocation = clientOrLocation,
+        cost = cost
     )
 
     AlertDialog(

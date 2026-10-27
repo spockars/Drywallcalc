@@ -13,7 +13,9 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.example.drywall.ui.screens.CalculationFormScreen
 import com.example.drywall.ui.screens.CalculationResultsScreen
+import com.example.drywall.ui.screens.PricesScreen
 import com.example.drywall.ui.screens.ProjectsListScreen
 import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
@@ -111,6 +114,24 @@ fun DrywallCalculatorScreen(
                     label = { Text("Resultados") },
                     modifier = Modifier.testTag("nav_tab_results")
                 )
+
+                // Tab 4: Catálogo de precios unitarios
+                NavigationBarItem(
+                    selected = uiState.currentScreen == AppScreen.PRICES,
+                    onClick = { viewModel.navigateTo(AppScreen.PRICES) },
+                    icon = {
+                        Icon(
+                            imageVector = if (uiState.currentScreen == AppScreen.PRICES) {
+                                Icons.Filled.Payments
+                            } else {
+                                Icons.Outlined.Payments
+                            },
+                            contentDescription = "Precios unitarios"
+                        )
+                    },
+                    label = { Text("Precios") },
+                    modifier = Modifier.testTag("nav_tab_prices")
+                )
             }
         }
     ) { innerPadding ->
@@ -133,6 +154,9 @@ fun DrywallCalculatorScreen(
                     }
                     AppScreen.RESULTS -> {
                         CalculationResultsScreen(viewModel = viewModel)
+                    }
+                    AppScreen.PRICES -> {
+                        PricesScreen(viewModel = viewModel)
                     }
                 }
             }
