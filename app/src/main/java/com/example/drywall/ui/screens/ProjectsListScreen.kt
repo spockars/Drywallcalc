@@ -57,9 +57,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.drywall.data.local.entity.ProjectWithCalculations
 import com.example.drywall.data.local.entity.WallCalculationEntity
+import com.example.drywall.data.local.entity.effectiveNetAreaM2
+import com.example.drywall.data.local.entity.totalPaintUnits
 import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 import com.example.drywall.util.DrywallReportExporter
+import com.example.drywall.util.NumberFormatUtils
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -132,7 +135,10 @@ fun ProjectsListScreen(
                             projectWithCalcs = projectWithCalcs,
                             dateFormat = dateFormat,
                             onLoadCalculation = { calc ->
-                                viewModel.loadSavedCalculation(calc)
+                                viewModel.loadSavedCalculation(projectWithCalcs.toWallWithOpenings(calc))
+                            },
+                            onDeleteCalculation = { wall ->
+                                viewModel.setCalculationPendingDelete(wall)
                             },
                             onDeleteClick = {
                                 viewModel.setProjectPendingDelete(projectWithCalcs)
@@ -142,6 +148,41 @@ fun ProjectsListScreen(
                 }
             }
         }
+    }
+
+    uiState.calculationPendingDelete?.let { wallToDelete ->
+        AlertDialog(
+            onDismissRequest = { viewModel.setCalculationPendingDelete(null) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = { Text("¿Eliminar Muro? ") },
+            text = {
+                Text(
+                    "Se eliminará el muro \"${wallToDelete.wallName}\" de la obra, con sus vanos. " +
+                        "Los demás muros no se tocan."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCalculation(wallToDelete.id)
+                        viewModel.setCalculationPendingDelete(null)
+                    }
+                ) {
+                    Text("Eliminar muro")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.setCalculationPendingDelete(null) }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     uiState.projectPendingDelete?.let { projectToDelete ->
@@ -270,6 +311,7 @@ fun ProjectCard(
     projectWithCalcs: ProjectWithCalculations,
     dateFormat: SimpleDateFormat,
     onLoadCalculation: (WallCalculationEntity) -> Unit,
+    onDeleteCalculation: (WallCalculationEntity) -> Unit,
     onDeleteClick: () -> Unit
 ) {
     ElevatedCard(
@@ -332,13 +374,25 @@ fun ProjectCard(
                                     append("📍 *Cliente / Ubicación:* ${projectWithCalcs.project.clientOrLocation}\n")
                                 }
                                 append("📊 *Métricas Totales:*\n")
-                                append("• Superficie total: ${"%.2f".format(projectWithCalcs.totalAreaM2)} m²\n")
+                                append("• Superficie neta: ${NumberFormatUtils.formatSquareMeters(projectWithCalcs.totalNetAreaM2)}\n")
                                 append("• Total placas: ${projectWithCalcs.totalBoards} unid\n")
-                                append("• Total perfiles 3m: ${projectWithCalcs.totalProfiles3m} piezas\n\n")
-                                append("🧱 *Muros de la obra (${projectWithCalcs.calculations.size}):*\n")
+                                append("• Total perfiles 3m: ${projectWithCalcs.totalProfiles3m} piezas\n")
+                                if (projectWithCalcs.totalPaintUnits > 0) {
+                                    append("• Pintura total: ${projectWithCalcs.totalPaintUnits} envases\n")
+                                }
+                                append("\n🧱 *Muros de la obra (${projectWithCalcs.calculations.size}):*\n")
                                 projectWithCalcs.calculations.forEach { calc ->
-                                    append("• *${calc.wallName}*: ${calc.lengthMeters}m × ${calc.heightMeters}m (${if (calc.faces == "BOTH_FACES") "2 Caras" else "1 Cara"})\n")
-                                    append("   → ${calc.totalBoardsCount} placas | ${calc.totalProfiles3mCount} perfiles 3m\n")
+                                    val wallOpenings = projectWithCalcs.openingsFor(calc.id)
+                                    append("• *${calc.wallName}*: ${NumberFormatUtils.formatDecimal(calc.lengthMeters, 1)}m × ${NumberFormatUtils.formatDecimal(calc.heightMeters, 1)}m (${if (calc.faces == "BOTH_FACES") "2 Caras" else "1 Cara"})\n")
+                                    append("   → ${calc.totalBoardsCount} placas | ${calc.totalProfiles3mCount} perfiles 3m")
+                                    append(" | ${NumberFormatUtils.formatSquareMeters(calc.effectiveNetAreaM2)} netos")
+                                    if (wallOpenings.isNotEmpty()) {
+                                        append(" | ${wallOpenings.size} vano(s)")
+                                    }
+                                    if (calc.totalPaintUnits > 0) {
+                                        append(" | ${calc.totalPaintUnits} envases pintura")
+                                    }
+                                    append("\n")
                                 }
                                 append("\nGenerado por *DrywallCalc* 📱")
                             }
@@ -377,12 +431,12 @@ fun ProjectCard(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Superficie",
+                        text = "Superficie neta",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "%.2f m²".format(projectWithCalcs.totalAreaM2),
+                        text = NumberFormatUtils.formatSquareMeters(projectWithCalcs.totalNetAreaM2),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -413,6 +467,21 @@ fun ProjectCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                }
+                if (projectWithCalcs.totalPaintUnits > 0) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Pintura",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${projectWithCalcs.totalPaintUnits} env",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
@@ -451,14 +520,36 @@ fun ProjectCard(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "${calc.lengthMeters}m x ${calc.heightMeters}m (${if (calc.faces == "BOTH_FACES") "2 Caras" else "1 Cara"}) • ${calc.totalDrywallAreaM2} m²",
+                                text = "${NumberFormatUtils.formatDecimal(calc.lengthMeters, 1)}m x " +
+                                    "${NumberFormatUtils.formatDecimal(calc.heightMeters, 1)}m " +
+                                    "(${if (calc.faces == "BOTH_FACES") "2 Caras" else "1 Cara"}) • " +
+                                    "${NumberFormatUtils.formatSquareMeters(calc.effectiveNetAreaM2)} netos" +
+                                    if (projectWithCalcs.openingsFor(calc.id).isNotEmpty()) {
+                                        " • ${projectWithCalcs.openingsFor(calc.id).size} vano(s)"
+                                    } else {
+                                        ""
+                                    },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "${calc.totalBoardsCount} placas • ${calc.totalProfiles3mCount} perfiles 3m",
+                                text = "${calc.totalBoardsCount} placas • " +
+                                    "${calc.totalProfiles3mCount} perfiles 3m" +
+                                    if (calc.totalPaintUnits > 0) " • ${calc.totalPaintUnits} envases pintura" else "",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { onDeleteCalculation(calc) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Eliminar muro",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 

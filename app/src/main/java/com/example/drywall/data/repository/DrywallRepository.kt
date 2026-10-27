@@ -3,7 +3,8 @@ package com.example.drywall.data.repository
 import com.example.drywall.data.local.dao.ProjectDao
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
-import com.example.drywall.data.local.entity.WallCalculationEntity
+import com.example.drywall.data.mapper.toEntity
+import com.example.drywall.data.mapper.toOpeningEntities
 import com.example.drywall.domain.model.WallCalculationResult
 import kotlinx.coroutines.flow.Flow
 
@@ -32,6 +33,9 @@ interface DrywallRepository {
 
 /**
  * Implementación concreta del repositorio utilizando [ProjectDao].
+ *
+ * Cada muro se guarda con sus vanos y su resultado de pintura, y el proyecto se marca como
+ * modificado para que la lista de obras refleje el último cambio.
  */
 class DrywallRepositoryImpl(
     private val projectDao: ProjectDao
@@ -52,32 +56,19 @@ class DrywallRepositoryImpl(
     ): Long {
         val now = System.currentTimeMillis()
         val project = ProjectEntity(
-            name = projectName.ifBlank { "Proyecto ${now}" },
+            name = projectName.ifBlank { "Proyecto $now" },
             clientOrLocation = clientOrLocation,
             notes = notes,
             createdAt = now,
             updatedAt = now
         )
         val projectId = projectDao.insertProject(project)
-
-        val calculationEntity = WallCalculationEntity(
+        insertWall(
             projectId = projectId,
             wallName = wallName.ifBlank { "Muro 1" },
-            lengthMeters = calculationResult.input.lengthMeters,
-            heightMeters = calculationResult.input.heightMeters,
-            faces = calculationResult.input.faces.name,
-            hasInsulation = calculationResult.input.hasInsulation,
-            studSpacingMeters = calculationResult.input.studSpacingMeters,
-            boardType = calculationResult.input.boardType.name,
-            wasteFactor = calculationResult.input.wasteFactor,
-            totalDrywallAreaM2 = calculationResult.input.totalDrywallArea,
-            totalBoardsCount = calculationResult.totalBoardsRequired,
-            totalProfiles3mCount = calculationResult.totalProfiles3mRequired,
-            summaryNotes = "Placas: ${calculationResult.totalBoardsRequired} unid, Perfiles 3m: ${calculationResult.totalProfiles3mRequired} unid",
-            createdAt = now
+            calculationResult = calculationResult,
+            timestamp = now
         )
-        projectDao.insertCalculation(calculationEntity)
-
         return projectId
     }
 
@@ -87,23 +78,14 @@ class DrywallRepositoryImpl(
         calculationResult: WallCalculationResult
     ): Long {
         val now = System.currentTimeMillis()
-        val calculationEntity = WallCalculationEntity(
+        val wallId = insertWall(
             projectId = projectId,
             wallName = wallName.ifBlank { "Muro Adicional" },
-            lengthMeters = calculationResult.input.lengthMeters,
-            heightMeters = calculationResult.input.heightMeters,
-            faces = calculationResult.input.faces.name,
-            hasInsulation = calculationResult.input.hasInsulation,
-            studSpacingMeters = calculationResult.input.studSpacingMeters,
-            boardType = calculationResult.input.boardType.name,
-            wasteFactor = calculationResult.input.wasteFactor,
-            totalDrywallAreaM2 = calculationResult.input.totalDrywallArea,
-            totalBoardsCount = calculationResult.totalBoardsRequired,
-            totalProfiles3mCount = calculationResult.totalProfiles3mRequired,
-            summaryNotes = "Placas: ${calculationResult.totalBoardsRequired} unid, Perfiles 3m: ${calculationResult.totalProfiles3mRequired} unid",
-            createdAt = now
+            calculationResult = calculationResult,
+            timestamp = now
         )
-        return projectDao.insertCalculation(calculationEntity)
+        projectDao.touchProject(projectId, now)
+        return wallId
     }
 
     override suspend fun updateProject(project: ProjectEntity) {
@@ -116,5 +98,25 @@ class DrywallRepositoryImpl(
 
     override suspend fun deleteCalculation(calculationId: Long) {
         projectDao.deleteCalculationById(calculationId)
+    }
+
+    private suspend fun insertWall(
+        projectId: Long,
+        wallName: String,
+        calculationResult: WallCalculationResult,
+        timestamp: Long
+    ): Long {
+        val wallId = projectDao.insertCalculation(
+            calculationResult.toEntity(
+                projectId = projectId,
+                wallName = wallName,
+                createdAt = timestamp
+            )
+        )
+        val openings = calculationResult.toOpeningEntities(wallId = wallId, projectId = projectId)
+        if (openings.isNotEmpty()) {
+            projectDao.insertOpenings(openings)
+        }
+        return wallId
     }
 }

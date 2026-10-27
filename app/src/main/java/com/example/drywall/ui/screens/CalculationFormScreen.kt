@@ -65,6 +65,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.drywall.domain.model.DrywallBoardType
 import com.example.drywall.domain.model.WallFaces
+import com.example.drywall.ui.components.OpeningsCard
+import com.example.drywall.ui.components.PaintCard
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 
 /**
@@ -111,6 +113,30 @@ fun CalculationFormScreen(
         derivedStateOf { lengthValidation == null && heightValidation == null }
     }
 
+    // Impacto inmediato de los vanos sobre la superficie neta del muro
+    val openingsAreaM2 by remember(uiState.openingDrafts) {
+        derivedStateOf {
+            uiState.openingDrafts.sumOf { draft ->
+                val width = draft.widthInput.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+                val height = draft.heightInput.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+                if (width > 0.0 && height > 0.0) width * height else 0.0
+            }
+        }
+    }
+
+    val netAreaM2 by remember(uiState.openingDrafts, uiState.lengthInput, uiState.heightInput) {
+        derivedStateOf {
+            val length = uiState.lengthInput.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+            val height = uiState.heightInput.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+            (length * height - openingsAreaM2).coerceAtLeast(0.0)
+        }
+    }
+
+    // La pintura se calcula sobre el área neta de placa (todas las caras emplazadas)
+    val paintAreaM2 by remember(netAreaM2, uiState.faces) {
+        derivedStateOf { netAreaM2 * uiState.faces.factor }
+    }
+
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -155,6 +181,24 @@ fun CalculationFormScreen(
                 }
             }
 
+            // Vanos (puertas y ventanas) del muro
+            item {
+                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                    OpeningsCard(
+                        drafts = uiState.openingDrafts,
+                        errors = uiState.openingsValidationErrors,
+                        openingsAreaM2 = openingsAreaM2,
+                        netAreaM2 = netAreaM2,
+                        onAddOpening = viewModel::addOpening,
+                        onClearOpenings = viewModel::clearOpenings,
+                        onRemoveOpening = viewModel::removeOpening,
+                        onTypeChange = viewModel::updateOpeningType,
+                        onWidthChange = viewModel::updateOpeningWidth,
+                        onHeightChange = viewModel::updateOpeningHeight
+                    )
+                }
+            }
+
             // Configuración Técnica del Muro
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
@@ -171,12 +215,36 @@ fun CalculationFormScreen(
                 }
             }
 
+            // Pintura del muro (sellador + manos de acabado)
+            item {
+                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                    PaintCard(
+                        enabled = uiState.paintEnabled,
+                        productName = uiState.paintProductNameInput,
+                        unit = uiState.paintUnit,
+                        coverageInput = uiState.paintCoverageInput,
+                        finishCoatsInput = uiState.paintFinishCoatsInput,
+                        wastePercentInput = uiState.paintWastePercentInput,
+                        errors = uiState.paintValidationErrors,
+                        paintAreaM2 = paintAreaM2,
+                        onEnabledChange = viewModel::onPaintEnabledToggled,
+                        onProductNameChange = viewModel::onPaintProductNameChanged,
+                        onUnitChange = viewModel::onPaintUnitChanged,
+                        onCoverageChange = viewModel::onPaintCoverageChanged,
+                        onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
+                        onWasteChange = viewModel::onPaintWasteChanged
+                    )
+                }
+            }
+
             // Botón de Acción Principal para Calcular y Ver Resultados
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
                     Button(
                         onClick = { viewModel.calculateAndGoToResults() },
-                        enabled = isFormValid,
+                        enabled = isFormValid &&
+                            uiState.openingsValidationErrors.isEmpty() &&
+                            uiState.paintValidationErrors.isEmpty(),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()

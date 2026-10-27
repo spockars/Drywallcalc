@@ -74,10 +74,13 @@ import androidx.compose.ui.unit.dp
 import com.example.drywall.domain.model.MaterialCategory
 import com.example.drywall.domain.model.MaterialRequirement
 import com.example.drywall.domain.model.WallCalculationResult
+import com.example.drywall.ui.components.PaintSummaryCard
 import com.example.drywall.ui.components.SaveProjectDialog
 import com.example.drywall.ui.components.ShareReportDialog
 import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
+import com.example.drywall.util.NumberFormatUtils
+import kotlin.math.roundToInt
 
 /**
  * Pantalla de Resultados con desglose completo de insumos estilo tarjeta.
@@ -185,6 +188,16 @@ fun CalculationResultsScreen(
                     }
                 }
 
+                // Resumen de pintura, solo si el muro la tiene configurada
+                val paintEstimate = result.paint
+                if (paintEstimate != null) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            PaintSummaryCard(estimate = paintEstimate)
+                        }
+                    }
+                }
+
                 // Filtro por Categoría de Materiales
                 item {
                     Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
@@ -223,14 +236,18 @@ fun CalculationResultsScreen(
     if (uiState.showSaveDialog) {
         SaveProjectDialog(
             defaultWallName = "Muro ${uiState.lengthInput}x${uiState.heightInput}m",
+            existingProjects = uiState.savedProjects,
             onDismiss = { viewModel.setShowSaveDialog(false) },
-            onConfirm = { projectName, client, notes, wallName ->
+            onSaveAsNewProject = { projectName, client, notes, wallName ->
                 viewModel.saveCurrentProject(
                     projectName = projectName,
                     clientOrLocation = client,
                     notes = notes,
                     wallName = wallName
                 )
+            },
+            onAddToExistingProject = { projectId, wallName ->
+                viewModel.addCurrentCalculationToProject(projectId = projectId, wallName = wallName)
             }
         )
     }
@@ -281,7 +298,7 @@ fun ResultsSummaryBanner(
                     color = MaterialTheme.colorScheme.primary
                 ) {
                     Text(
-                        text = "+8% Desperdicio",
+                        text = "+${(result.input.wasteFactor * 100).roundToInt()}% Desperdicio",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -297,8 +314,12 @@ fun ResultsSummaryBanner(
             ) {
                 SummaryMetricItem(
                     label = "Superficie a Emplacar",
-                    value = "%.2f m²".format(result.input.totalDrywallArea),
-                    subtext = result.input.faces.label
+                    value = NumberFormatUtils.formatSquareMeters(result.netTotalDrywallArea),
+                    subtext = if (result.openingsCount > 0) {
+                        "${result.input.faces.label} · neta (${result.openingsCount} vano/s)"
+                    } else {
+                        result.input.faces.label
+                    }
                 )
                 SummaryMetricItem(
                     label = "Placas (1.22x2.44)",
@@ -506,7 +527,7 @@ fun MaterialDetailCard(
                     }
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = requirement.unit.pluralName,
+                        text = requirement.unitLabel,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -526,12 +547,13 @@ fun MaterialDetailCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Base: %.2f".format(requirement.rawQuantity),
+                    text = "Base: ${NumberFormatUtils.formatDecimal(requirement.rawQuantity)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "+8% Desp: %.2f".format(requirement.quantityWithWaste),
+                    text = "+${(requirement.wastePercentage * 100).roundToInt()}% Desp: " +
+                        NumberFormatUtils.formatDecimal(requirement.quantityWithWaste),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Medium
@@ -578,14 +600,31 @@ fun copyResultToClipboard(context: Context, result: WallCalculationResult) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val sb = StringBuilder()
     sb.append("=== LISTA DE MATERIALES DRYWALL ===\n")
-    sb.append("Dimensiones: ${result.input.lengthMeters} m x ${result.input.heightMeters} m (${result.input.faces.label})\n")
-    sb.append("Superficie total: %.2f m²\n".format(result.input.totalDrywallArea))
-    sb.append("Desperdicio aplicado: 8%\n\n")
+    sb.append(
+        "Dimensiones: ${NumberFormatUtils.formatMeters(result.input.lengthMeters)} x " +
+            "${NumberFormatUtils.formatMeters(result.input.heightMeters)} (${result.input.faces.label})\n"
+    )
+    sb.append("Superficie neta a emplacar: ${NumberFormatUtils.formatSquareMeters(result.netTotalDrywallArea)}\n")
+    if (result.openingsCount > 0) {
+        sb.append(
+            "Vanos: ${result.openingsCount} (descuentan " +
+                "${NumberFormatUtils.formatSquareMeters(result.openingsAreaM2)} por cara)\n"
+        )
+    }
+    sb.append("Desperdicio aplicado: ${(result.input.wasteFactor * 100).roundToInt()}%\n")
+    result.paint?.let { paint ->
+        sb.append(
+            "Pintura: ${paint.totalUnits} ${paint.unitLabelForTotal} " +
+                "(${paint.sealerUnits} sellador + ${paint.finishUnits} acabado) " +
+                "sobre ${NumberFormatUtils.formatSquareMeters(paint.areaM2)}\n"
+        )
+    }
+    sb.append("\n")
 
     for ((category, items) in result.requirementsByCategory) {
         sb.append("[${category.displayName.uppercase()}]\n")
         for (req in items) {
-            sb.append("- ${req.material.name}: ${req.commercialQuantity} ${req.unit.pluralName}\n")
+            sb.append("- ${req.material.name}: ${req.commercialQuantity} ${req.unitLabel}\n")
         }
         sb.append("\n")
     }

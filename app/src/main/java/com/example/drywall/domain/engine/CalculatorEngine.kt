@@ -8,6 +8,8 @@ import com.example.drywall.domain.model.UnitOfMeasure
 import com.example.drywall.domain.model.WallCalculationInput
 import com.example.drywall.domain.model.WallCalculationResult
 import com.example.drywall.domain.model.WallFaces
+import com.example.drywall.domain.model.WallOpening
+import com.example.drywall.util.NumberFormatUtils
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -184,18 +186,34 @@ class CalculatorEngine {
      */
     fun calculate(input: WallCalculationInput): WallCalculationResult {
         val wasteMultiplier = 1.0 + input.wasteFactor
+
+        // Defensa en profundidad: un vano imposible nunca debe producir cantidades 0 silenciosas.
+        if (input.openings.isNotEmpty()) {
+            if (input.openings.any { it.widthMeters <= 0.0 || it.heightMeters <= 0.0 }) {
+                throw IllegalArgumentException("Cada vano debe tener ancho y alto mayores a 0 m.")
+            }
+            if (input.openingsAreaOneFace >= input.wallAreaOneFace) {
+                throw IllegalArgumentException(
+                    "Los vanos suman ${NumberFormatUtils.formatSquareMeters(input.openingsAreaOneFace)} " +
+                        "sobre un muro de ${NumberFormatUtils.formatSquareMeters(input.wallAreaOneFace)}: " +
+                        "el muro quedaría sin superficie emplazable."
+                )
+            }
+        }
         val requirements = mutableListOf<MaterialRequirement>()
 
         val length = input.lengthMeters
         val height = input.heightMeters
         val studSpacing = input.studSpacingMeters
-        val totalDrywallArea = input.totalDrywallArea
+        val netDrywallArea = input.netTotalDrywallArea
 
         // =========================================================================
         // 1. CANAL / GUÍA SUPERIOR E INFERIOR (Piso y Techo)
         // =========================================================================
         // El muro requiere canal a lo largo en la base (piso) y en la coronación (techo).
-        val trackLinearMetersRaw = length * 2.0
+        // Un canal por vano hace las veces de dintel sobre la abertura.
+        val headersLinearMetersRaw = input.headersLinearMeters
+        val trackLinearMetersRaw = length * 2.0 + headersLinearMetersRaw
         val trackLinearMetersWithWaste = trackLinearMetersRaw * wasteMultiplier
         val trackPieces3m = ceil(trackLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
             .toInt().coerceAtLeast(1)
@@ -208,7 +226,14 @@ class CalculatorEngine {
                 quantityWithWaste = trackLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
                 commercialQuantity = trackPieces3m,
                 unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "Canal piso + techo: ${trackLinearMetersRaw.format(2)} m lineales base + ${input.wastePercentageString()} desperdicio = ${trackLinearMetersWithWaste.format(2)} m. Comerciales: $trackPieces3m piezas de 3.0m."
+                formulaExplanation = buildString {
+                    append("Canal piso + techo: ${(length * 2.0).format(2)} m")
+                    if (input.openings.isNotEmpty()) {
+                        append(" + dinteles de vano: ${headersLinearMetersRaw.format(2)} m (1 canal por vano)")
+                    }
+                    append(" = ${trackLinearMetersRaw.format(2)} m lineales base + ${input.wastePercentageString()} desperdicio")
+                    append(" = ${trackLinearMetersWithWaste.format(2)} m. Comerciales: $trackPieces3m piezas de 3.0m.")
+                }
             )
         )
 
@@ -216,7 +241,9 @@ class CalculatorEngine {
         // 2. POSTES / PARANTES VERTICALES (Separación típica 0.407 m o 0.61 m)
         // =========================================================================
         // Número de líneas verticales = división del largo entre modulación + 1 (arranque inicial)
-        val studLinesCount = ceil(length / studSpacing).toInt() + 1
+        val modulationStudLinesCount = ceil(length / studSpacing).toInt() + 1
+        // Cada vano exige dos postes de jamba, uno a cada lado de la abertura.
+        val studLinesCount = modulationStudLinesCount + input.jambStudsCount
         val studLinearMetersRaw = studLinesCount * height
         val studLinearMetersWithWaste = studLinearMetersRaw * wasteMultiplier
 
@@ -236,7 +263,13 @@ class CalculatorEngine {
                 quantityWithWaste = studLinesCount * wasteMultiplier,
                 commercialQuantity = studPieces3m,
                 unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "$studLinesCount líneas verticales a cada ${(studSpacing * 100).roundToInt()} cm x ${height.format(2)} m de alto. Con ${input.wastePercentageString()} desperdicio = $studPieces3m piezas de 3.0m."
+                formulaExplanation = buildString {
+                    append("$studLinesCount líneas verticales a cada ${(studSpacing * 100).roundToInt()} cm x ${height.format(2)} m de alto")
+                    if (input.openings.isNotEmpty()) {
+                        append(" ($modulationStudLinesCount por modulación + ${input.jambStudsCount} postes de jamba en ${input.openings.size} vano/s)")
+                    }
+                    append(". Con ${input.wastePercentageString()} desperdicio = $studPieces3m piezas de 3.0m.")
+                }
             )
         )
 
@@ -266,7 +299,7 @@ class CalculatorEngine {
         // 4. PLACAS DE YESO (Drywall Boards 1.22 x 2.44 m)
         // =========================================================================
         val boardMaterial = DrywallCatalog.getBoardMaterial(input.boardType)
-        val boardsRawCount = totalDrywallArea / BOARD_SURFACE_AREA_M2
+        val boardsRawCount = netDrywallArea / BOARD_SURFACE_AREA_M2
         val boardsCountWithWaste = boardsRawCount * wasteMultiplier
         val commercialBoardsCount = ceil(boardsCountWithWaste).toInt().coerceAtLeast(1)
 
@@ -278,7 +311,14 @@ class CalculatorEngine {
                 quantityWithWaste = boardsCountWithWaste,
                 commercialQuantity = commercialBoardsCount,
                 unit = UnitOfMeasure.PLACAS_ESTANDAR,
-                formulaExplanation = "Área total a emplacar: ${totalDrywallArea.format(2)} m² (${input.faces.label}). Área por placa: ${BOARD_SURFACE_AREA_M2.format(2)} m². Base: ${boardsRawCount.format(2)} + ${input.wastePercentageString()} desperdicio = $commercialBoardsCount placas."
+                formulaExplanation = buildString {
+                    append("Área neta a emplacar: ${netDrywallArea.format(2)} m² (${input.faces.label}")
+                    if (input.openings.isNotEmpty()) {
+                        append("; ${input.openings.size} vano/s descuentan ${input.openingsAreaOneFace.format(2)} m² por cara")
+                    }
+                    append("). Área por placa: ${BOARD_SURFACE_AREA_M2.format(2)} m².")
+                    append(" Base: ${boardsRawCount.format(2)} + ${input.wastePercentageString()} desperdicio = $commercialBoardsCount placas.")
+                }
             )
         )
 
@@ -326,7 +366,9 @@ class CalculatorEngine {
         // 7. ANCLAJES (Chazos con tornillo para canales de piso y techo)
         // =========================================================================
         // Fijación a la estructura soporte cada 0.50 metros lineales de solera
-        val anchorPointsRaw = (trackLinearMetersRaw / ANCHOR_SPACING_METERS) + 2.0 // +2 anclajes de borde
+        // Solo las soleras superior e inferior se anclan a piso y losa; los dinteles no llevan anclaje.
+        val anchorSolerasLinearMeters = length * 2.0
+        val anchorPointsRaw = (anchorSolerasLinearMeters / ANCHOR_SPACING_METERS) + 2.0 // +2 anclajes de borde
         val anchorPointsWithWaste = anchorPointsRaw * wasteMultiplier
         val commercialAnchors = ceil(anchorPointsWithWaste).toInt()
 
@@ -338,7 +380,7 @@ class CalculatorEngine {
                 quantityWithWaste = anchorPointsWithWaste,
                 commercialQuantity = commercialAnchors,
                 unit = UnitOfMeasure.UNIDADES,
-                formulaExplanation = "Anclajes cada 50 cm en ${trackLinearMetersRaw.format(2)} m de soleras = ${anchorPointsRaw.format(1)} puntos + ${input.wastePercentageString()} desperdicio = $commercialAnchors unidades."
+                formulaExplanation = "Anclajes cada 50 cm sobre ${anchorSolerasLinearMeters.format(2)} m de soleras (largo x 2) = ${anchorPointsRaw.format(1)} puntos + ${input.wastePercentageString()} desperdicio = $commercialAnchors unidades."
             )
         )
 
@@ -346,7 +388,10 @@ class CalculatorEngine {
         // 8. CINTA DE PAPEL PARA JUNTAS (Rollos de 75 m)
         // =========================================================================
         // Promedio de 1.5 metros lineales de cinta por m² de placa
-        val tapeLinearMetersRaw = totalDrywallArea * TAPE_METERS_PER_M2_BOARD
+        val tapeBoardLinearMetersRaw = netDrywallArea * TAPE_METERS_PER_M2_BOARD
+        // El vano atraviesa el muro: su perímetro se cinta en cada cara emplazada.
+        val tapeOpeningsLinearMetersRaw = input.openingsPerimeterMeters * input.faces.factor
+        val tapeLinearMetersRaw = tapeBoardLinearMetersRaw + tapeOpeningsLinearMetersRaw
         val tapeLinearMetersWithWaste = tapeLinearMetersRaw * wasteMultiplier
         val commercialTapeRolls = ceil(tapeLinearMetersWithWaste / TAPE_ROLL_COMMERCIAL_METERS)
             .toInt().coerceAtLeast(1)
@@ -359,7 +404,15 @@ class CalculatorEngine {
                 quantityWithWaste = tapeLinearMetersWithWaste / TAPE_ROLL_COMMERCIAL_METERS,
                 commercialQuantity = commercialTapeRolls,
                 unit = UnitOfMeasure.ROLLOS,
-                formulaExplanation = "${totalDrywallArea.format(2)} m² de placa x 1.5 m/m² = ${tapeLinearMetersRaw.format(1)} m lineales + ${input.wastePercentageString()} desperdicio = ${tapeLinearMetersWithWaste.format(1)} m ($commercialTapeRolls rollo/s de 75m)."
+                formulaExplanation = buildString {
+                    append("${netDrywallArea.format(2)} m² netos de placa x 1.5 m/m² = ${tapeBoardLinearMetersRaw.format(1)} m")
+                    if (input.openings.isNotEmpty()) {
+                        append(" + cinta de perímetro de vanos: ${tapeOpeningsLinearMetersRaw.format(1)} m")
+                        append(" (2 x (ancho + alto) x ${input.faces.factor} cara(s) en ${input.openings.size} vano/s)")
+                    }
+                    append(" = ${tapeLinearMetersRaw.format(1)} m lineales + ${input.wastePercentageString()} desperdicio")
+                    append(" = ${tapeLinearMetersWithWaste.format(1)} m ($commercialTapeRolls rollo/s de 75m).")
+                }
             )
         )
 
@@ -367,7 +420,7 @@ class CalculatorEngine {
         // 9. MASILLA PARA JUNTAS (Baldes de 28 kg)
         // =========================================================================
         // Rendimiento técnico: 1.0 kg de masilla lista por m² de placa instalada (3 manos)
-        val compoundKgRaw = totalDrywallArea * COMPOUND_KG_PER_M2_BOARD
+        val compoundKgRaw = netDrywallArea * COMPOUND_KG_PER_M2_BOARD
         val compoundKgWithWaste = compoundKgRaw * wasteMultiplier
         val commercialCompoundBuckets = ceil(compoundKgWithWaste / COMPOUND_BUCKET_KG)
             .toInt().coerceAtLeast(1)
@@ -380,7 +433,7 @@ class CalculatorEngine {
                 quantityWithWaste = compoundKgWithWaste / COMPOUND_BUCKET_KG,
                 commercialQuantity = commercialCompoundBuckets,
                 unit = UnitOfMeasure.BALDES_28KG,
-                formulaExplanation = "${totalDrywallArea.format(2)} m² x 1.0 kg/m² = ${compoundKgRaw.format(1)} kg base + ${input.wastePercentageString()} desperdicio = ${compoundKgWithWaste.format(1)} kg ($commercialCompoundBuckets balde/s de 28kg)."
+                formulaExplanation = "${netDrywallArea.format(2)} m² netos x 1.0 kg/m² = ${compoundKgRaw.format(1)} kg base + ${input.wastePercentageString()} desperdicio = ${compoundKgWithWaste.format(1)} kg ($commercialCompoundBuckets balde/s de 28kg)."
             )
         )
 
@@ -388,7 +441,7 @@ class CalculatorEngine {
         // 10. AISLAMIENTO TERMOACÚSTICO (Opcional: Si hasInsulation == true)
         // =========================================================================
         if (input.hasInsulation) {
-            val insulationAreaRaw = input.wallAreaOneFace
+            val insulationAreaRaw = input.netAreaOneFace
             val insulationAreaWithWaste = insulationAreaRaw * wasteMultiplier
             val commercialInsulationRolls = ceil(insulationAreaWithWaste / INSULATION_ROLL_AREA_M2)
                 .toInt().coerceAtLeast(1)
@@ -401,7 +454,7 @@ class CalculatorEngine {
                     quantityWithWaste = insulationAreaWithWaste / INSULATION_ROLL_AREA_M2,
                     commercialQuantity = commercialInsulationRolls,
                     unit = UnitOfMeasure.ROLLOS,
-                    formulaExplanation = "Área de tabique: ${insulationAreaRaw.format(2)} m² + ${input.wastePercentageString()} desperdicio = ${insulationAreaWithWaste.format(2)} m² ($commercialInsulationRolls rollo/s de 12 m²)."
+                    formulaExplanation = "Área neta de tabique: ${insulationAreaRaw.format(2)} m² + ${input.wastePercentageString()} desperdicio = ${insulationAreaWithWaste.format(2)} m² ($commercialInsulationRolls rollo/s de 12 m²)."
                 )
             )
         }
@@ -422,7 +475,8 @@ class CalculatorEngine {
         hasInsulation: Boolean = false,
         wasteFactor: Double = 0.08,
         studSpacingMeters: Double = 0.407,
-        boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST
+        boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
+        openings: List<WallOpening> = emptyList()
     ): WallCalculationResult {
         val faces = if (isTwoFaces) WallFaces.BOTH_FACES else WallFaces.ONE_FACE
         val input = WallCalculationInput(
@@ -432,7 +486,8 @@ class CalculatorEngine {
             hasInsulation = hasInsulation,
             studSpacingMeters = studSpacingMeters,
             boardType = boardType,
-            wasteFactor = wasteFactor
+            wasteFactor = wasteFactor,
+            openings = openings
         )
         return calculate(input)
     }
@@ -440,5 +495,5 @@ class CalculatorEngine {
     private fun WallCalculationInput.wastePercentageString(): String =
         "${(wasteFactor * 100).roundToInt()}%"
 
-    private fun Double.format(decimals: Int): String = "%.${decimals}f".format(this)
+    private fun Double.format(decimals: Int): String = NumberFormatUtils.formatDecimal(this, decimals)
 }

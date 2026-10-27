@@ -16,3 +16,12 @@
 local.properties
 .env
 debug.keystore
+
+# Archivos de contexto del workspace del agente (no forman parte del repositorio)
+/AGENTS.md
+/SOUL.md
+/MEMORY.md
+/IDENTITY.md
+/USER.md
+/TOOLS.md
+/HEARTBEAT.md

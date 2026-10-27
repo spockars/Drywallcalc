@@ -80,6 +80,11 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+// Exporta el esquema de Room para poder escribir y validar migraciones reales.
+ksp {
+  arg("room.schemaLocation", "${projectDir}/schemas")
+}
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
