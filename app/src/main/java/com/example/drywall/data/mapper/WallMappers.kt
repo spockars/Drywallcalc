@@ -8,6 +8,8 @@ import com.example.drywall.domain.model.PaintEstimate
 import com.example.drywall.domain.model.PaintProduct
 import com.example.drywall.domain.model.PaintSpec
 import com.example.drywall.domain.model.PaintUnit
+import com.example.drywall.domain.model.ProfileGauge
+import com.example.drywall.domain.model.ProfileWidth
 import com.example.drywall.domain.model.WallCalculationInput
 import com.example.drywall.domain.model.WallCalculationResult
 import com.example.drywall.domain.model.WallFaces
@@ -40,6 +42,8 @@ fun WallCalculationEntity.toInput(openings: List<WallOpeningEntity> = emptyList(
         boardType = runCatching { DrywallBoardType.valueOf(boardType) }
             .getOrDefault(DrywallBoardType.ESTANDAR_ST),
         wasteFactor = wasteFactor,
+        profileWidth = runCatching { ProfileWidth.valueOf(profileWidth) }.getOrDefault(ProfileWidth.MM_60),
+        profileGauge = runCatching { ProfileGauge.valueOf(profileGauge) }.getOrDefault(ProfileGauge.CALIBRE_26),
         openings = openings.map { it.toDomain() }
     )
 
@@ -101,7 +105,9 @@ fun WallCalculationResult.toEntity(
         paintCoverageM2PerUnit = paintEstimate?.coverageM2PerUnit ?: 0.0,
         paintAreaM2 = paintEstimate?.areaM2 ?: 0.0,
         paintSealerUnits = paintEstimate?.sealerUnits ?: 0,
-        paintFinishUnits = paintEstimate?.finishUnits ?: 0
+        paintFinishUnits = paintEstimate?.finishUnits ?: 0,
+        profileWidth = input.profileWidth.name,
+        profileGauge = input.profileGauge.name
     )
 }
 

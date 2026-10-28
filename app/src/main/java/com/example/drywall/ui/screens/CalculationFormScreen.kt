@@ -63,6 +63,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.drywall.domain.model.ConstructionElementType
 import com.example.drywall.domain.model.DrywallBoardType
+import com.example.drywall.domain.model.ProfileGauge
+import com.example.drywall.domain.model.ProfileWidth
 import com.example.drywall.domain.model.WallFaces
 import com.example.drywall.ui.components.OpeningsCard
 import com.example.drywall.ui.components.PaintCard
@@ -214,10 +216,14 @@ fun CalculationFormScreen(
                                 studSpacingMeters = uiState.studSpacingMeters,
                                 boardType = uiState.boardType,
                                 hasInsulation = uiState.hasInsulation,
+                                profileWidth = uiState.profileWidth,
+                                profileGauge = uiState.profileGauge,
                                 onFacesChange = viewModel::onFacesChanged,
                                 onStudSpacingChange = viewModel::onStudSpacingChanged,
                                 onBoardTypeChange = viewModel::onBoardTypeChanged,
-                                onInsulationToggle = viewModel::onInsulationToggled
+                                onInsulationToggle = viewModel::onInsulationToggled,
+                                onProfileWidthChange = viewModel::onProfileWidthChanged,
+                                onProfileGaugeChange = viewModel::onProfileGaugeChanged
                             )
                         }
                     }
@@ -265,10 +271,14 @@ fun CalculationFormScreen(
                                 studSpacingMeters = uiState.studSpacingMeters,
                                 boardType = uiState.boardType,
                                 hasInsulation = uiState.hasInsulation,
+                                profileWidth = uiState.profileWidth,
+                                profileGauge = uiState.profileGauge,
                                 onFacesChange = {},
                                 onStudSpacingChange = viewModel::onStudSpacingChanged,
                                 onBoardTypeChange = viewModel::onBoardTypeChanged,
-                                onInsulationToggle = viewModel::onInsulationToggled
+                                onInsulationToggle = viewModel::onInsulationToggled,
+                                onProfileWidthChange = viewModel::onProfileWidthChanged,
+                                onProfileGaugeChange = viewModel::onProfileGaugeChanged
                             )
                         }
                     }
@@ -880,10 +890,14 @@ fun TechnicalSpecsCard(
     studSpacingMeters: Double,
     boardType: DrywallBoardType,
     hasInsulation: Boolean,
+    profileWidth: ProfileWidth,
+    profileGauge: ProfileGauge,
     onFacesChange: (WallFaces) -> Unit,
     onStudSpacingChange: (Double) -> Unit,
     onBoardTypeChange: (DrywallBoardType) -> Unit,
-    onInsulationToggle: (Boolean) -> Unit
+    onInsulationToggle: (Boolean) -> Unit,
+    onProfileWidthChange: (ProfileWidth) -> Unit,
+    onProfileGaugeChange: (ProfileGauge) -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -957,6 +971,50 @@ fun TechnicalSpecsCard(
                         selected = studSpacingMeters >= 0.5,
                         onClick = { onStudSpacingChange(0.61) },
                         label = { Text("61 cm") }
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            Text(
+                text = "Ancho de Perfil (Norma NSR-10)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProfileWidth.entries.forEach { width ->
+                    FilterChip(
+                        selected = profileWidth == width,
+                        onClick = { onProfileWidthChange(width) },
+                        label = { Text(width.displayName) }
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            Text(
+                text = "Calibre de Acero Galvanizado",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProfileGauge.entries.forEach { gauge ->
+                    FilterChip(
+                        selected = profileGauge == gauge,
+                        onClick = { onProfileGaugeChange(gauge) },
+                        label = { Text(gauge.displayName) }
                     )
                 }
             }

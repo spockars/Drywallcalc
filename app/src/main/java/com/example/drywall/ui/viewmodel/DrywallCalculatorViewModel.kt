@@ -32,6 +32,8 @@ import com.example.drywall.domain.model.PaintUnit
 import com.example.drywall.domain.model.PriceCatalogItem
 import com.example.drywall.domain.model.PriceEntry
 import com.example.drywall.domain.model.PriceKeys
+import com.example.drywall.domain.model.ProfileGauge
+import com.example.drywall.domain.model.ProfileWidth
 import com.example.drywall.domain.model.ProjectLabor
 import com.example.drywall.domain.model.PvcCeilingInput
 import com.example.drywall.domain.model.WallCalculationInput
@@ -52,6 +54,7 @@ import kotlinx.coroutines.launch
  */
 enum class AppScreen(val label: String) {
     PROJECTS("Proyectos"),
+    DASHBOARD("Nuevo Cómputo"),
     CALCULATOR("Calculadora"),
     RESULTS("Resultados"),
     PRICES("Precios")
@@ -99,6 +102,8 @@ data class DrywallCalculatorUiState(
     val furnitureDepthInput: String = "0.35",
     val horizontalShelvesCountInput: String = "2",
     val verticalDividersCountInput: String = "1",
+    val profileWidth: ProfileWidth = ProfileWidth.MM_60,
+    val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
     // Pintura (calculador separado del motor de drywall)
     val paintEnabled: Boolean = false,
     val paintProductNameInput: String = "",
@@ -663,6 +668,9 @@ class DrywallCalculatorViewModel(
             DrywallBoardType.ESTANDAR_ST
         }
 
+        val profileWidth = runCatching { ProfileWidth.valueOf(calc.profileWidth) }.getOrDefault(ProfileWidth.MM_60)
+        val profileGauge = runCatching { ProfileGauge.valueOf(calc.profileGauge) }.getOrDefault(ProfileGauge.CALIBRE_26)
+
         _uiState.update {
             it.copy(
                 lengthInput = calc.lengthMeters.toInputString(),
@@ -672,6 +680,8 @@ class DrywallCalculatorViewModel(
                 studSpacingMeters = calc.studSpacingMeters,
                 boardType = boardType,
                 wastePercentage = calc.wasteFactor * 100.0,
+                profileWidth = profileWidth,
+                profileGauge = profileGauge,
                 paintEnabled = calc.paintEnabled,
                 paintProductNameInput = calc.paintProductName,
                 paintUnit = runCatching { PaintUnit.valueOf(calc.paintUnit) }
@@ -871,6 +881,16 @@ class DrywallCalculatorViewModel(
 
     fun onPaintFinishCoatsChanged(value: String) {
         _uiState.update { it.copy(paintFinishCoatsInput = value) }
+        calculateMaterials()
+    }
+
+    fun onProfileWidthChanged(width: ProfileWidth) {
+        _uiState.update { it.copy(profileWidth = width) }
+        calculateMaterials()
+    }
+
+    fun onProfileGaugeChanged(gauge: ProfileGauge) {
+        _uiState.update { it.copy(profileGauge = gauge) }
         calculateMaterials()
     }
 

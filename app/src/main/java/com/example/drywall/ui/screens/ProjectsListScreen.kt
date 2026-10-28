@@ -100,7 +100,7 @@ fun ProjectsListScreen(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { viewModel.navigateTo(AppScreen.CALCULATOR) },
+                onClick = { viewModel.navigateTo(AppScreen.DASHBOARD) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Nuevo Cómputo") },
                 modifier = Modifier.testTag("new_computation_fab")
@@ -131,7 +131,7 @@ fun ProjectsListScreen(
                     Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
                         EmptyProjectsState(
                             hasSearch = uiState.searchQuery.isNotBlank(),
-                            onCreateNew = { viewModel.navigateTo(AppScreen.CALCULATOR) }
+                            onCreateNew = { viewModel.navigateTo(AppScreen.DASHBOARD) }
                         )
                     }
                 }

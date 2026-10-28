@@ -26,7 +26,7 @@ import com.example.drywall.data.local.entity.WallOpeningEntity
         WallOpeningEntity::class,
         MaterialPriceEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class DrywallDatabase : RoomDatabase() {
@@ -192,8 +192,24 @@ abstract class DrywallDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migración 4 → 5.
+         *
+         * Agrega los selectores de ancho de perfil y calibre según la norma colombiana (NSR-10 / Icontec).
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `profileWidth` TEXT NOT NULL DEFAULT 'MM_60'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `profileGauge` TEXT NOT NULL DEFAULT 'CALIBRE_26'"
+                )
+            }
+        }
+
         /** Todas las migraciones registradas, en orden. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         @Volatile
         private var INSTANCE: DrywallDatabase? = null

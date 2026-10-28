@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.example.drywall.ui.screens.CalculationFormScreen
 import com.example.drywall.ui.screens.CalculationResultsScreen
+import com.example.drywall.ui.screens.ElementDashboardScreen
 import com.example.drywall.ui.screens.PricesScreen
 import com.example.drywall.ui.screens.ProjectsListScreen
 import com.example.drywall.ui.viewmodel.AppScreen
@@ -148,6 +149,9 @@ fun DrywallCalculatorScreen(
                 when (screen) {
                     AppScreen.PROJECTS -> {
                         ProjectsListScreen(viewModel = viewModel)
+                    }
+                    AppScreen.DASHBOARD -> {
+                        ElementDashboardScreen(viewModel = viewModel)
                     }
                     AppScreen.CALCULATOR -> {
                         CalculationFormScreen(viewModel = viewModel)

@@ -135,6 +135,24 @@ data class MaterialRequirement(
 }
 
 /**
+ * Anchos de perfiles metálicos según la norma colombiana (NSR-10 / Icontec).
+ */
+enum class ProfileWidth(val code: String, val displayName: String, val sizeMm: Int) {
+    MM_60("60mm", "60 mm (Estándar 2-1/2\")", 60),
+    MM_64("64mm", "64 mm (Comercial 2-1/2\")", 64),
+    MM_90("90mm", "90 mm (Estructural 3-5/8\")", 90)
+}
+
+/**
+ * Calibres de acero galvanizado según norma técnica.
+ */
+enum class ProfileGauge(val code: String, val displayName: String, val description: String) {
+    CALIBRE_26("CAL_26", "Calibre 26 (Económico / Residencial)", "Espesor nominal ~0.45 mm"),
+    CALIBRE_24("CAL_24", "Calibre 24 (Comercial Estándar)", "Espesor nominal ~0.55 mm"),
+    CALIBRE_22("CAL_22", "Calibre 22 (Estructural / Comercial Pesado)", "Espesor nominal ~0.75 mm")
+}
+
+/**
  * Parámetros de entrada para el cálculo de un muro en seco.
  */
 data class WallCalculationInput(
@@ -145,6 +163,8 @@ data class WallCalculationInput(
     val studSpacingMeters: Double = 0.407,
     val boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
     val wasteFactor: Double = 0.08,
+    val profileWidth: ProfileWidth = ProfileWidth.MM_60,
+    val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
     val openings: List<WallOpening> = emptyList()
 ) {
     init {

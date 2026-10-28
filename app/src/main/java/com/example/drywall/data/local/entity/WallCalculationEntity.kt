@@ -74,6 +74,10 @@ data class WallCalculationEntity(
     @ColumnInfo(defaultValue = "0")
     val verticalDividersCount: Int = 0,
     @ColumnInfo(defaultValue = "0.0")
-    val depthMeters: Double = 0.0
+    val depthMeters: Double = 0.0,
+    @ColumnInfo(defaultValue = "MM_60")
+    val profileWidth: String = "MM_60",
+    @ColumnInfo(defaultValue = "CALIBRE_26")
+    val profileGauge: String = "CALIBRE_26"
 )
 
