@@ -6,9 +6,11 @@ import com.example.drywall.data.local.entity.effectiveNetAreaM2
 import com.example.drywall.domain.engine.CalculatorEngine
 import com.example.drywall.domain.engine.CostCalculator
 import com.example.drywall.domain.model.Budget
+import com.example.drywall.domain.model.ConstructionElementType
 import com.example.drywall.domain.model.LaborMode
 import com.example.drywall.domain.model.PriceEntry
 import com.example.drywall.domain.model.ProjectLabor
+import com.example.drywall.domain.model.WallCalculationInput
 import com.example.drywall.domain.model.WallCalculationResult
 import com.example.drywall.domain.model.WallCost
 
@@ -48,11 +50,8 @@ fun ProjectWithCalculations.toLabor(): ProjectLabor = ProjectLabor(
 )
 
 /**
- * Reconstruye el cómputo de cada muro (incluidos vanos y pintura) y calcula su costo con el
- * catálogo de precios vigente.
- *
- * Se recalcula en vez de guardar el desglose: así un cambio de precio se refleja de inmediato
- * en las obras ya guardadas, sin migrar datos históricos.
+ * Reconstruye el cómputo de cada elemento (muros, cielos rasos, muebles) y calcula su costo
+ * con el catálogo de precios vigente.
  */
 fun ProjectWithCalculations.toBudgetView(
     engine: CalculatorEngine,
@@ -62,9 +61,53 @@ fun ProjectWithCalculations.toBudgetView(
     val wallResults = mutableMapOf<Long, WallCalculationResult>()
 
     calculations.forEach { wall ->
-        val result = engine
-            .calculate(wall.toInput(openingsFor(wall.id)))
-            .copy(paint = wall.toPaintEstimate())
+        val result = when (wall.elementType) {
+            ConstructionElementType.CIELO_RASO_DRYWALL.name -> {
+                val ceilingInput = wall.toDrywallCeilingInput()
+                val reqs = engine.calculateDrywallCeiling(ceilingInput)
+                val dummyWallInput = WallCalculationInput(
+                    lengthMeters = ceilingInput.lengthMeters,
+                    heightMeters = ceilingInput.widthMeters,
+                    wasteFactor = ceilingInput.wasteFactor
+                )
+                WallCalculationResult(
+                    input = dummyWallInput,
+                    requirements = reqs,
+                    paint = wall.toPaintEstimate()
+                )
+            }
+            ConstructionElementType.CIELO_RASO_PVC.name -> {
+                val pvcInput = wall.toPvcCeilingInput()
+                val reqs = engine.calculatePvcCeiling(pvcInput)
+                val dummyWallInput = WallCalculationInput(
+                    lengthMeters = pvcInput.lengthMeters,
+                    heightMeters = pvcInput.widthMeters,
+                    wasteFactor = pvcInput.wasteFactor
+                )
+                WallCalculationResult(
+                    input = dummyWallInput,
+                    requirements = reqs
+                )
+            }
+            ConstructionElementType.MUEBLE_DRYWALL.name -> {
+                val furnitureInput = wall.toFurnitureInput()
+                val reqs = engine.calculateFurniture(furnitureInput)
+                val dummyWallInput = WallCalculationInput(
+                    lengthMeters = furnitureInput.widthMeters,
+                    heightMeters = furnitureInput.heightMeters,
+                    wasteFactor = furnitureInput.wasteFactor
+                )
+                WallCalculationResult(
+                    input = dummyWallInput,
+                    requirements = reqs
+                )
+            }
+            else -> {
+                engine
+                    .calculate(wall.toInput(openingsFor(wall.id)))
+                    .copy(paint = wall.toPaintEstimate())
+            }
+        }
         wallResults[wall.id] = result
         wallCosts[wall.id] = CostCalculator.buildWallCost(result, prices)
     }

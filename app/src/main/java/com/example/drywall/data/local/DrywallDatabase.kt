@@ -26,7 +26,7 @@ import com.example.drywall.data.local.entity.WallOpeningEntity
         WallOpeningEntity::class,
         MaterialPriceEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class DrywallDatabase : RoomDatabase() {
@@ -157,8 +157,43 @@ abstract class DrywallDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migración 3 → 4.
+         *
+         * Agrega soporte para múltiples tipos de elementos (`elementType`), parámetros para cielos rasos
+         * de drywall y PVC, y parámetros para muebles/repisas de drywall.
+         */
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `elementType` TEXT NOT NULL DEFAULT 'MURO_DRYWALL'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `suspensionHeightMeters` REAL NOT NULL DEFAULT 0.30"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `mainBeamSpacingMeters` REAL NOT NULL DEFAULT 0.80"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `slatWidthMeters` REAL NOT NULL DEFAULT 0.25"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `commercialSlatLengthMeters` REAL NOT NULL DEFAULT 5.95"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `horizontalShelvesCount` INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `verticalDividersCount` INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE `wall_calculations` ADD COLUMN `depthMeters` REAL NOT NULL DEFAULT 0.0"
+                )
+            }
+        }
+
         /** Todas las migraciones registradas, en orden. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
         @Volatile
         private var INSTANCE: DrywallDatabase? = null

@@ -3,13 +3,28 @@ package com.example.drywall.domain.model
 import com.example.drywall.util.NumberFormatUtils
 
 /**
+ * Tipo de elemento constructivo en drywall / construcción liviana.
+ */
+enum class ConstructionElementType(
+    val code: String,
+    val displayName: String,
+    val iconName: String,
+    val description: String
+) {
+    MURO_DRYWALL("MURO_DRYWALL", "Muro de Drywall", "layers", "Muros divisorios y revestimientos"),
+    CIELO_RASO_DRYWALL("CIELO_RASO_DRYWALL", "Cielo Raso Drywall", "ceiling", "Cielos rasos suspendidos de yeso"),
+    CIELO_RASO_PVC("CIELO_RASO_PVC", "Cielo Raso PVC", "grid_view", "Cielos rasos en tablillas machihembradas PVC"),
+    MUEBLE_DRYWALL("MUEBLE_DRYWALL", "Mueble / Repisa Drywall", "shelves", "Muebles de TV, repisas y nichos")
+}
+
+/**
  * Categorías principales de materiales para construcción en seco (Drywall).
  */
 enum class MaterialCategory(val displayName: String, val iconName: String) {
     ESTRUCTURA("Estructura Metálica", "architecture"),
-    PLACAS("Placas de Yeso", "layers"),
+    PLACAS("Placas y Tablillas", "layers"),
     FIJACIONES("Tornillería y Anclajes", "build"),
-    ACABADOS("Tratamiento de Juntas", "brush"),
+    ACABADOS("Tratamiento de Juntas y Acabados", "brush"),
     AISLAMIENTO("Aislamiento Termoacústico", "shield")
 }
 
@@ -19,6 +34,7 @@ enum class MaterialCategory(val displayName: String, val iconName: String) {
 enum class UnitOfMeasure(val symbol: String, val singularName: String, val pluralName: String) {
     UNIDADES("unid", "unidad", "unidades"),
     PIEZAS_3M("piezas", "pieza de 3.0 m", "piezas de 3.0 m"),
+    PIEZAS_5_95M("piezas", "pieza de 5.95 m", "piezas de 5.95 m"),
     PLACAS_ESTANDAR("placas", "placa (1.22 x 2.44 m)", "placas (1.22 x 2.44 m)"),
     METROS_LINEALES("ml", "metro lineal", "metros lineales"),
     METROS_CUADRADOS("m²", "metro cuadrado", "metros cuadrados"),
@@ -253,3 +269,98 @@ data class WallCalculationResult(
     val openingsCount: Int
         get() = input.openings.size
 }
+
+/**
+ * Parámetros para el cálculo de un cielo raso suspendido en drywall.
+ */
+data class DrywallCeilingInput(
+    val lengthMeters: Double,
+    val widthMeters: Double,
+    val suspensionHeightMeters: Double = 0.30,
+    val omegaSpacingMeters: Double = 0.407,
+    val mainBeamSpacingMeters: Double = 0.80,
+    val boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
+    val hasInsulation: Boolean = false,
+    val wasteFactor: Double = 0.08
+) {
+    init {
+        require(lengthMeters > 0) { "El largo del techo debe ser mayor a 0 m" }
+        require(widthMeters > 0) { "El ancho del techo debe ser mayor a 0 m" }
+        require(suspensionHeightMeters >= 0) { "La altura de descolgado no puede ser negativa" }
+    }
+
+    val areaM2: Double
+        get() = lengthMeters * widthMeters
+
+    val perimeterMeters: Double
+        get() = 2 * (lengthMeters + widthMeters)
+}
+
+/**
+ * Parámetros para el cálculo de un cielo raso en tablillas PVC.
+ */
+data class PvcCeilingInput(
+    val lengthMeters: Double,
+    val widthMeters: Double,
+    val slatWidthMeters: Double = 0.25,
+    val commercialSlatLengthMeters: Double = 5.95,
+    val supportSpacingMeters: Double = 0.50,
+    val wasteFactor: Double = 0.08
+) {
+    init {
+        require(lengthMeters > 0) { "El largo del techo debe ser mayor a 0 m" }
+        require(widthMeters > 0) { "El ancho del techo debe ser mayor a 0 m" }
+        require(slatWidthMeters > 0) { "El ancho de la tablilla debe ser mayor a 0 m" }
+        require(commercialSlatLengthMeters > 0) { "El largo comercial debe ser mayor a 0 m" }
+    }
+
+    val areaM2: Double
+        get() = lengthMeters * widthMeters
+
+    val perimeterMeters: Double
+        get() = 2 * (lengthMeters + widthMeters)
+}
+
+/**
+ * Parámetros para el cálculo de un mueble / repisa en drywall.
+ */
+data class FurnitureCalculationInput(
+    val widthMeters: Double,
+    val heightMeters: Double,
+    val depthMeters: Double,
+    val horizontalShelvesCount: Int = 2,
+    val verticalDividersCount: Int = 1,
+    val boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
+    val wasteFactor: Double = 0.12
+) {
+    init {
+        require(widthMeters > 0) { "El ancho del mueble debe ser mayor a 0 m" }
+        require(heightMeters > 0) { "El alto del mueble debe ser mayor a 0 m" }
+        require(depthMeters > 0) { "La profundidad debe ser mayor a 0 m" }
+        require(horizontalShelvesCount >= 0) { "El número de repisas no puede ser negativo" }
+        require(verticalDividersCount >= 0) { "El número de separadores no puede ser negativo" }
+    }
+
+    /**
+     * Estimación de la superficie total a revestir (caras frontales, laterales, repisas superiores e inferiores).
+     */
+    val totalExposedAreaM2: Double
+        get() {
+            val mainFrameArea = (widthMeters * heightMeters) * 2
+            val shelfArea = (widthMeters * depthMeters) * (horizontalShelvesCount + 1) * 2
+            val dividerArea = (heightMeters * depthMeters) * (verticalDividersCount + 1) * 2
+            return mainFrameArea + shelfArea + dividerArea
+        }
+
+    /**
+     * Metros lineales de cantos exteriores que exigen esquinero metálico perforado.
+     */
+    val totalCornerBeadLinearMeters: Double
+        get() {
+            val mainFrameEdges = (widthMeters * 2) + (heightMeters * 2)
+            val shelfEdges = widthMeters * (horizontalShelvesCount + 1) * 2
+            val dividerEdges = heightMeters * (verticalDividersCount + 1) * 2
+            return mainFrameEdges + shelfEdges + dividerEdges
+        }
+}
+

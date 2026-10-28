@@ -7,19 +7,24 @@ import androidx.lifecycle.viewModelScope
 import com.example.drywall.data.local.DrywallDatabase
 import com.example.drywall.data.local.entity.ProjectWithCalculations
 import com.example.drywall.data.local.entity.WallCalculationEntity
-import com.example.drywall.data.repository.DrywallRepository
-import com.example.drywall.data.repository.DrywallRepositoryImpl
-import com.example.drywall.domain.engine.CalculatorEngine
-import com.example.drywall.domain.model.DrywallBoardType
-import com.example.drywall.domain.model.OpeningType
 import com.example.drywall.data.local.entity.WallWithOpenings
 import com.example.drywall.data.mapper.ProjectBudgetView
 import com.example.drywall.data.mapper.toBudgetView
+import com.example.drywall.data.mapper.toEntity
 import com.example.drywall.data.mapper.toLabor
+import com.example.drywall.data.repository.DrywallRepository
+import com.example.drywall.data.repository.DrywallRepositoryImpl
 import com.example.drywall.domain.engine.ALL_DRYWALL_MATERIALS
+import com.example.drywall.domain.engine.CalculatorEngine
 import com.example.drywall.domain.engine.CostCalculator
 import com.example.drywall.domain.engine.PaintCalculator
+import com.example.drywall.domain.model.ConstructionElementType
+import com.example.drywall.domain.model.DrywallBoardType
+import com.example.drywall.domain.model.DrywallCeilingInput
+import com.example.drywall.domain.model.FurnitureCalculationInput
 import com.example.drywall.domain.model.LaborMode
+import com.example.drywall.domain.model.MaterialCategory
+import com.example.drywall.domain.model.OpeningType
 import com.example.drywall.domain.model.PaintProduct
 import com.example.drywall.domain.model.PaintRole
 import com.example.drywall.domain.model.PaintSpec
@@ -28,13 +33,13 @@ import com.example.drywall.domain.model.PriceCatalogItem
 import com.example.drywall.domain.model.PriceEntry
 import com.example.drywall.domain.model.PriceKeys
 import com.example.drywall.domain.model.ProjectLabor
-import com.example.drywall.domain.model.WallCost
-import com.example.drywall.domain.model.WallOpening
-import com.example.drywall.util.NumberFormatUtils
-import com.example.drywall.domain.model.MaterialCategory
+import com.example.drywall.domain.model.PvcCeilingInput
 import com.example.drywall.domain.model.WallCalculationInput
 import com.example.drywall.domain.model.WallCalculationResult
+import com.example.drywall.domain.model.WallCost
 import com.example.drywall.domain.model.WallFaces
+import com.example.drywall.domain.model.WallOpening
+import com.example.drywall.util.NumberFormatUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +73,9 @@ data class WallOpeningDraft(
  */
 data class DrywallCalculatorUiState(
     val currentScreen: AppScreen = AppScreen.CALCULATOR,
+    val selectedElementType: ConstructionElementType = ConstructionElementType.MURO_DRYWALL,
+    val elementNameInput: String = "Elemento 1",
+    // Form Inputs - Muro
     val lengthInput: String = "4.0",
     val heightInput: String = "2.6",
     val faces: WallFaces = WallFaces.BOTH_FACES,
@@ -77,6 +85,20 @@ data class DrywallCalculatorUiState(
     val wastePercentage: Double = 8.0,
     val openingDrafts: List<WallOpeningDraft> = emptyList(),
     val openingsValidationErrors: List<String> = emptyList(),
+    // Form Inputs - Cielo Raso Drywall
+    val ceilingWidthInput: String = "3.0",
+    val suspensionHeightInput: String = "0.30",
+    val mainBeamSpacingMeters: Double = 0.80,
+    // Form Inputs - Cielo Raso PVC
+    val pvcSlatWidthInput: String = "0.25",
+    val pvcCommercialSlatLengthInput: String = "5.95",
+    val pvcSupportSpacingMeters: Double = 0.50,
+    // Form Inputs - Mueble Drywall
+    val furnitureWidthInput: String = "2.0",
+    val furnitureHeightInput: String = "1.8",
+    val furnitureDepthInput: String = "0.35",
+    val horizontalShelvesCountInput: String = "2",
+    val verticalDividersCountInput: String = "1",
     // Pintura (calculador separado del motor de drywall)
     val paintEnabled: Boolean = false,
     val paintProductNameInput: String = "",
@@ -103,6 +125,7 @@ data class DrywallCalculatorUiState(
     val savedProjects: List<ProjectWithCalculations> = emptyList(),
     val searchQuery: String = "",
     val showSaveDialog: Boolean = false,
+    val showCreateProjectDialog: Boolean = false,
     val showProjectsSheet: Boolean = false,
     val projectPendingDelete: ProjectWithCalculations? = null,
     val calculationPendingDelete: WallCalculationEntity? = null,
@@ -341,10 +364,11 @@ class DrywallCalculatorViewModel(
     }
 
     /**
-     * Agrega el cómputo actual como un muro adicional de una obra ya existente.
+     * Agrega el cómputo actual como un elemento adicional de una obra ya existente.
      */
     fun addCurrentCalculationToProject(projectId: Long, wallName: String) {
-        val currentResult = _uiState.value.calculationResult
+        val state = _uiState.value
+        val currentResult = state.calculationResult
         if (currentResult == null) {
             _uiState.update { it.copy(errorMessage = "No hay un cálculo válido para agregar a la obra.") }
             return
@@ -358,20 +382,17 @@ class DrywallCalculatorViewModel(
 
         viewModelScope.launch {
             try {
-                repo.addCalculationToProject(
-                    projectId = projectId,
-                    wallName = wallName,
-                    calculationResult = currentResult
-                )
+                val entity = buildElementEntity(projectId, wallName, state, currentResult)
+                repo.addCalculationEntityToProject(entity)
                 _uiState.update {
                     it.copy(
                         showSaveDialog = false,
-                        userNotification = "Muro \"$wallName\" agregado a la obra"
+                        userNotification = "Elemento \"${entity.wallName}\" agregado a la obra"
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(userNotification = "Error al agregar el muro: ${e.localizedMessage}")
+                    it.copy(userNotification = "Error al agregar el elemento: ${e.localizedMessage}")
                 }
             }
         }
@@ -476,7 +497,8 @@ class DrywallCalculatorViewModel(
         notes: String,
         wallName: String
     ) {
-        val currentResult = _uiState.value.calculationResult
+        val state = _uiState.value
+        val currentResult = state.calculationResult
         if (currentResult == null) {
             _uiState.update { it.copy(errorMessage = "No hay un cálculo válido para guardar.") }
             return
@@ -490,17 +512,13 @@ class DrywallCalculatorViewModel(
 
         viewModelScope.launch {
             try {
-                repo.saveProjectWithCalculation(
-                    projectName = projectName,
-                    clientOrLocation = clientOrLocation,
-                    notes = notes,
-                    calculationResult = currentResult,
-                    wallName = wallName
-                )
+                val projectId = repo.createEmptyProject(projectName, clientOrLocation, notes)
+                val entity = buildElementEntity(projectId, wallName, state, currentResult)
+                repo.addCalculationEntityToProject(entity)
                 _uiState.update {
                     it.copy(
                         showSaveDialog = false,
-                        userNotification = "Proyecto \"$projectName\" guardado en el dispositivo"
+                        userNotification = "Obra \"$projectName\" guardada en el dispositivo"
                     )
                 }
             } catch (e: Exception) {
@@ -510,6 +528,123 @@ class DrywallCalculatorViewModel(
             }
         }
     }
+
+    private fun buildElementEntity(
+        projectId: Long,
+        elementName: String,
+        state: DrywallCalculatorUiState,
+        result: WallCalculationResult
+    ): WallCalculationEntity {
+        val now = System.currentTimeMillis()
+        val name = elementName.ifBlank {
+            when (state.selectedElementType) {
+                ConstructionElementType.MURO_DRYWALL -> "Muro 1"
+                ConstructionElementType.CIELO_RASO_DRYWALL -> "Cielo Raso Drywall 1"
+                ConstructionElementType.CIELO_RASO_PVC -> "Cielo Raso PVC 1"
+                ConstructionElementType.MUEBLE_DRYWALL -> "Mueble Drywall 1"
+            }
+        }
+
+        return when (state.selectedElementType) {
+            ConstructionElementType.CIELO_RASO_DRYWALL -> {
+                val len = state.lengthInput.parseDimension() ?: 4.0
+                val wid = state.ceilingWidthInput.parseDimension() ?: 3.0
+                val susp = state.suspensionHeightInput.parseDimension() ?: 0.30
+                WallCalculationEntity(
+                    projectId = projectId,
+                    wallName = name,
+                    lengthMeters = len,
+                    heightMeters = wid,
+                    faces = "ONE_FACE",
+                    hasInsulation = state.hasInsulation,
+                    studSpacingMeters = state.studSpacingMeters,
+                    boardType = state.boardType.name,
+                    wasteFactor = state.wastePercentage / 100.0,
+                    totalDrywallAreaM2 = len * wid,
+                    netAreaM2 = len * wid,
+                    totalBoardsCount = result.totalBoardsRequired,
+                    totalProfiles3mCount = result.totalProfiles3mRequired,
+                    summaryNotes = "Cielo Raso Drywall: ${(len * wid).format(1)} m²",
+                    createdAt = now,
+                    elementType = ConstructionElementType.CIELO_RASO_DRYWALL.name,
+                    suspensionHeightMeters = susp,
+                    mainBeamSpacingMeters = state.mainBeamSpacingMeters,
+                    paintEnabled = state.paintEnabled,
+                    paintFinishCoats = state.paintFinishCoatsInput.trim().toIntOrNull() ?: 2,
+                    paintWasteFactor = (state.paintWastePercentInput.parseDimension() ?: 10.0) / 100.0,
+                    paintProductName = state.paintProductNameInput,
+                    paintUnit = state.paintUnit.name,
+                    paintCoverageM2PerUnit = state.paintCoverageInput.parseDimension() ?: 0.0,
+                    paintAreaM2 = result.paint?.areaM2 ?: 0.0,
+                    paintSealerUnits = result.paint?.sealerUnits ?: 0,
+                    paintFinishUnits = result.paint?.finishUnits ?: 0
+                )
+            }
+            ConstructionElementType.CIELO_RASO_PVC -> {
+                val len = state.lengthInput.parseDimension() ?: 4.0
+                val wid = state.ceilingWidthInput.parseDimension() ?: 3.0
+                val slatW = state.pvcSlatWidthInput.parseDimension() ?: 0.25
+                val slatL = state.pvcCommercialSlatLengthInput.parseDimension() ?: 5.95
+                WallCalculationEntity(
+                    projectId = projectId,
+                    wallName = name,
+                    lengthMeters = len,
+                    heightMeters = wid,
+                    faces = "ONE_FACE",
+                    hasInsulation = false,
+                    studSpacingMeters = state.pvcSupportSpacingMeters,
+                    boardType = "PVC",
+                    wasteFactor = state.wastePercentage / 100.0,
+                    totalDrywallAreaM2 = len * wid,
+                    netAreaM2 = len * wid,
+                    totalBoardsCount = result.totalBoardsRequired,
+                    totalProfiles3mCount = result.totalProfiles3mRequired,
+                    summaryNotes = "Cielo Raso PVC: ${(len * wid).format(1)} m²",
+                    createdAt = now,
+                    elementType = ConstructionElementType.CIELO_RASO_PVC.name,
+                    slatWidthMeters = slatW,
+                    commercialSlatLengthMeters = slatL
+                )
+            }
+            ConstructionElementType.MUEBLE_DRYWALL -> {
+                val w = state.furnitureWidthInput.parseDimension() ?: 2.0
+                val h = state.furnitureHeightInput.parseDimension() ?: 1.8
+                val d = state.furnitureDepthInput.parseDimension() ?: 0.35
+                val shelves = state.horizontalShelvesCountInput.trim().toIntOrNull() ?: 2
+                val dividers = state.verticalDividersCountInput.trim().toIntOrNull() ?: 1
+                WallCalculationEntity(
+                    projectId = projectId,
+                    wallName = name,
+                    lengthMeters = w,
+                    heightMeters = h,
+                    faces = "ONE_FACE",
+                    hasInsulation = false,
+                    studSpacingMeters = 0.407,
+                    boardType = state.boardType.name,
+                    wasteFactor = state.wastePercentage / 100.0,
+                    totalDrywallAreaM2 = w * h,
+                    netAreaM2 = w * h,
+                    totalBoardsCount = result.totalBoardsRequired,
+                    totalProfiles3mCount = result.totalProfiles3mRequired,
+                    summaryNotes = "Mueble Drywall: ${w.format(1)}x${h.format(1)}x${d.format(1)} m",
+                    createdAt = now,
+                    elementType = ConstructionElementType.MUEBLE_DRYWALL.name,
+                    depthMeters = d,
+                    horizontalShelvesCount = shelves,
+                    verticalDividersCount = dividers
+                )
+            }
+            else -> {
+                result.toEntity(
+                    projectId = projectId,
+                    wallName = name,
+                    createdAt = now
+                )
+            }
+        }
+    }
+
+    private fun Double.format(decimals: Int): String = NumberFormatUtils.formatDecimal(this, decimals)
 
     /**
      * Carga un cálculo previamente guardado en el formulario y recalcula en vivo.
@@ -744,84 +879,286 @@ class DrywallCalculatorViewModel(
         calculateMaterials()
     }
 
-    fun calculateMaterials() {
-        val current = _uiState.value
-        val length = current.lengthInput.parseDimension()
-        val height = current.heightInput.parseDimension()
+    fun onElementTypeSelected(type: ConstructionElementType) {
+        _uiState.update { it.copy(selectedElementType = type, errorMessage = null) }
+        calculateMaterials()
+    }
 
-        if (length == null || length <= 0.0) {
-            _uiState.update {
-                it.copy(
-                    errorMessage = "Por favor ingresa un largo válido mayor a 0 metros.",
-                    calculationResult = null
-                )
-            }
-            return
-        }
+    fun onCeilingWidthChanged(value: String) {
+        _uiState.update { it.copy(ceilingWidthInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
 
-        if (height == null || height <= 0.0) {
-            _uiState.update {
-                it.copy(
-                    errorMessage = "Por favor ingresa una altura válida mayor a 0 metros.",
-                    calculationResult = null
-                )
-            }
-            return
-        }
+    fun onSuspensionHeightChanged(value: String) {
+        _uiState.update { it.copy(suspensionHeightInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
 
-        val wasteFactor = current.wastePercentage / 100.0
+    fun onPvcSlatWidthChanged(value: String) {
+        _uiState.update { it.copy(pvcSlatWidthInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
 
-        val openingsResolution = resolveOpenings(current.openingDrafts)
-        val openings = openingsResolution.openings
-        val draftErrors = openingsResolution.errors
+    fun onPvcCommercialSlatLengthChanged(value: String) {
+        _uiState.update { it.copy(pvcCommercialSlatLengthInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
 
-        try {
-            val input = WallCalculationInput(
-                lengthMeters = length,
-                heightMeters = height,
-                faces = current.faces,
-                hasInsulation = current.hasInsulation,
-                studSpacingMeters = current.studSpacingMeters,
-                boardType = current.boardType,
-                wasteFactor = wasteFactor,
-                openings = openings
-            )
+    fun onFurnitureWidthChanged(value: String) {
+        _uiState.update { it.copy(furnitureWidthInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
 
-            val openingErrors = draftErrors + input.validateOpenings()
-            if (openingErrors.isNotEmpty()) {
+    fun onFurnitureHeightChanged(value: String) {
+        _uiState.update { it.copy(furnitureHeightInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
+
+    fun onFurnitureDepthChanged(value: String) {
+        _uiState.update { it.copy(furnitureDepthInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
+
+    fun onHorizontalShelvesCountChanged(value: String) {
+        _uiState.update { it.copy(horizontalShelvesCountInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
+
+    fun onVerticalDividersCountChanged(value: String) {
+        _uiState.update { it.copy(verticalDividersCountInput = value, errorMessage = null) }
+        calculateMaterials()
+    }
+
+    fun onElementNameChanged(value: String) {
+        _uiState.update { it.copy(elementNameInput = value) }
+    }
+
+    fun setShowCreateProjectDialog(show: Boolean) {
+        _uiState.update { it.copy(showCreateProjectDialog = show) }
+    }
+
+    fun createEmptyProject(projectName: String, clientOrLocation: String, notes: String) {
+        val repo = repository ?: return
+        viewModelScope.launch {
+            try {
+                repo.createEmptyProject(projectName, clientOrLocation, notes)
                 _uiState.update {
                     it.copy(
-                        calculationResult = null,
-                        openingsValidationErrors = openingErrors,
-                        errorMessage = openingErrors.first()
+                        showCreateProjectDialog = false,
+                        userNotification = "Obra \"$projectName\" creada"
                     )
                 }
-                return
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(userNotification = "Error al crear obra: ${e.localizedMessage}")
+                }
             }
+        }
+    }
 
-            val baseResult = engine.calculate(input)
+    fun calculateMaterials() {
+        val current = _uiState.value
+        val wasteFactor = current.wastePercentage / 100.0
 
-            val paintSpec = buildPaintSpec(current)
-            val paintErrors = if (current.paintEnabled) {
-                PaintCalculator.validate(baseResult.netTotalDrywallArea, paintSpec)
-            } else {
-                emptyList()
-            }
-            val paintEstimate = if (current.paintEnabled && paintErrors.isEmpty()) {
-                runCatching {
-                    PaintCalculator.estimate(baseResult.netTotalDrywallArea, paintSpec)
-                }.getOrNull()
-            } else {
-                null
-            }
+        try {
+            when (current.selectedElementType) {
+                ConstructionElementType.CIELO_RASO_DRYWALL -> {
+                    val length = current.lengthInput.parseDimension()
+                    val width = current.ceilingWidthInput.parseDimension()
+                    val suspHeight = current.suspensionHeightInput.parseDimension() ?: 0.30
 
-            _uiState.update {
-                it.copy(
-                    calculationResult = baseResult.copy(paint = paintEstimate),
-                    errorMessage = null,
-                    openingsValidationErrors = emptyList(),
-                    paintValidationErrors = paintErrors
-                )
+                    if (length == null || length <= 0.0 || width == null || width <= 0.0) {
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = "Ingresa dimensiones válidas para el techo (largo y ancho mayores a 0 m).",
+                                calculationResult = null
+                            )
+                        }
+                        return
+                    }
+
+                    val ceilingInput = DrywallCeilingInput(
+                        lengthMeters = length,
+                        widthMeters = width,
+                        suspensionHeightMeters = suspHeight,
+                        omegaSpacingMeters = current.studSpacingMeters,
+                        mainBeamSpacingMeters = current.mainBeamSpacingMeters,
+                        boardType = current.boardType,
+                        hasInsulation = current.hasInsulation,
+                        wasteFactor = wasteFactor
+                    )
+
+                    val reqs = engine.calculateDrywallCeiling(ceilingInput)
+                    val dummyWallInput = WallCalculationInput(
+                        lengthMeters = length,
+                        heightMeters = width,
+                        wasteFactor = wasteFactor
+                    )
+
+                    val paintSpec = buildPaintSpec(current)
+                    val paintEstimate = if (current.paintEnabled) {
+                        runCatching { PaintCalculator.estimate(ceilingInput.areaM2, paintSpec) }.getOrNull()
+                    } else null
+
+                    _uiState.update {
+                        it.copy(
+                            calculationResult = WallCalculationResult(
+                                input = dummyWallInput,
+                                requirements = reqs,
+                                paint = paintEstimate
+                            ),
+                            errorMessage = null
+                        )
+                    }
+                }
+                ConstructionElementType.CIELO_RASO_PVC -> {
+                    val length = current.lengthInput.parseDimension()
+                    val width = current.ceilingWidthInput.parseDimension()
+                    val slatWidth = current.pvcSlatWidthInput.parseDimension() ?: 0.25
+                    val slatLength = current.pvcCommercialSlatLengthInput.parseDimension() ?: 5.95
+
+                    if (length == null || length <= 0.0 || width == null || width <= 0.0) {
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = "Ingresa dimensiones válidas para el techo PVC.",
+                                calculationResult = null
+                            )
+                        }
+                        return
+                    }
+
+                    val pvcInput = PvcCeilingInput(
+                        lengthMeters = length,
+                        widthMeters = width,
+                        slatWidthMeters = slatWidth,
+                        commercialSlatLengthMeters = slatLength,
+                        supportSpacingMeters = current.pvcSupportSpacingMeters,
+                        wasteFactor = wasteFactor
+                    )
+
+                    val reqs = engine.calculatePvcCeiling(pvcInput)
+                    val dummyWallInput = WallCalculationInput(
+                        lengthMeters = length,
+                        heightMeters = width,
+                        wasteFactor = wasteFactor
+                    )
+
+                    _uiState.update {
+                        it.copy(
+                            calculationResult = WallCalculationResult(
+                                input = dummyWallInput,
+                                requirements = reqs
+                            ),
+                            errorMessage = null
+                        )
+                    }
+                }
+                ConstructionElementType.MUEBLE_DRYWALL -> {
+                    val width = current.furnitureWidthInput.parseDimension()
+                    val height = current.furnitureHeightInput.parseDimension()
+                    val depth = current.furnitureDepthInput.parseDimension() ?: 0.35
+                    val shelves = current.horizontalShelvesCountInput.trim().toIntOrNull() ?: 2
+                    val dividers = current.verticalDividersCountInput.trim().toIntOrNull() ?: 1
+
+                    if (width == null || width <= 0.0 || height == null || height <= 0.0) {
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = "Ingresa dimensiones válidas para el mueble.",
+                                calculationResult = null
+                            )
+                        }
+                        return
+                    }
+
+                    val furnitureInput = FurnitureCalculationInput(
+                        widthMeters = width,
+                        heightMeters = height,
+                        depthMeters = depth,
+                        horizontalShelvesCount = shelves,
+                        verticalDividersCount = dividers,
+                        boardType = current.boardType,
+                        wasteFactor = wasteFactor
+                    )
+
+                    val reqs = engine.calculateFurniture(furnitureInput)
+                    val dummyWallInput = WallCalculationInput(
+                        lengthMeters = width,
+                        heightMeters = height,
+                        wasteFactor = wasteFactor
+                    )
+
+                    _uiState.update {
+                        it.copy(
+                            calculationResult = WallCalculationResult(
+                                input = dummyWallInput,
+                                requirements = reqs
+                            ),
+                            errorMessage = null
+                        )
+                    }
+                }
+                ConstructionElementType.MURO_DRYWALL -> {
+                    val length = current.lengthInput.parseDimension()
+                    val height = current.heightInput.parseDimension()
+
+                    if (length == null || length <= 0.0 || height == null || height <= 0.0) {
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = "Por favor ingresa un largo y alto válidos mayores a 0 metros.",
+                                calculationResult = null
+                            )
+                        }
+                        return
+                    }
+
+                    val openingsResolution = resolveOpenings(current.openingDrafts)
+                    val openings = openingsResolution.openings
+                    val draftErrors = openingsResolution.errors
+
+                    val input = WallCalculationInput(
+                        lengthMeters = length,
+                        heightMeters = height,
+                        faces = current.faces,
+                        hasInsulation = current.hasInsulation,
+                        studSpacingMeters = current.studSpacingMeters,
+                        boardType = current.boardType,
+                        wasteFactor = wasteFactor,
+                        openings = openings
+                    )
+
+                    val openingErrors = draftErrors + input.validateOpenings()
+                    if (openingErrors.isNotEmpty()) {
+                        _uiState.update {
+                            it.copy(
+                                calculationResult = null,
+                                openingsValidationErrors = openingErrors,
+                                errorMessage = openingErrors.first()
+                            )
+                        }
+                        return
+                    }
+
+                    val baseResult = engine.calculate(input)
+                    val paintSpec = buildPaintSpec(current)
+                    val paintErrors = if (current.paintEnabled) {
+                        PaintCalculator.validate(baseResult.netTotalDrywallArea, paintSpec)
+                    } else emptyList()
+
+                    val paintEstimate = if (current.paintEnabled && paintErrors.isEmpty()) {
+                        runCatching {
+                            PaintCalculator.estimate(baseResult.netTotalDrywallArea, paintSpec)
+                        }.getOrNull()
+                    } else null
+
+                    _uiState.update {
+                        it.copy(
+                            calculationResult = baseResult.copy(paint = paintEstimate),
+                            errorMessage = null,
+                            openingsValidationErrors = emptyList(),
+                            paintValidationErrors = paintErrors
+                        )
+                    }
+                }
             }
             recomputeCosts()
         } catch (e: Exception) {
@@ -835,25 +1172,7 @@ class DrywallCalculatorViewModel(
     }
 
     private fun autoCalculateIfValid() {
-        val length = _uiState.value.lengthInput.parseDimension()
-        val height = _uiState.value.heightInput.parseDimension()
-        if (length != null && length > 0.0 && height != null && height > 0.0) {
-            calculateMaterials()
-        } else {
-            val error = when {
-                _uiState.value.lengthInput.isBlank() -> "Por favor ingresa el largo del muro."
-                length == null || length <= 0.0 -> "El largo del muro debe ser un número mayor a 0."
-                _uiState.value.heightInput.isBlank() -> "Por favor ingresa la altura del muro."
-                height == null || height <= 0.0 -> "La altura del muro debe ser un número mayor a 0."
-                else -> null
-            }
-            _uiState.update {
-                it.copy(
-                    errorMessage = error,
-                    calculationResult = null
-                )
-            }
-        }
+        calculateMaterials()
     }
 }
 

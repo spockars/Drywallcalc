@@ -1,9 +1,12 @@
 package com.example.drywall.domain.engine
 
 import com.example.drywall.domain.model.DrywallBoardType
+import com.example.drywall.domain.model.DrywallCeilingInput
 import com.example.drywall.domain.model.DrywallMaterial
+import com.example.drywall.domain.model.FurnitureCalculationInput
 import com.example.drywall.domain.model.MaterialCategory
 import com.example.drywall.domain.model.MaterialRequirement
+import com.example.drywall.domain.model.PvcCeilingInput
 import com.example.drywall.domain.model.UnitOfMeasure
 import com.example.drywall.domain.model.WallCalculationInput
 import com.example.drywall.domain.model.WallCalculationResult
@@ -46,6 +49,68 @@ object DrywallCatalog {
         defaultUnit = UnitOfMeasure.PIEZAS_3M,
         commercialSpec = "Perfil omega galvanizado cal. 26 x 3.00 m",
         technicalFunction = "Refuerzo y arriostramiento horizontal intermedio para muros altos (>2.6 m) o trasdosados"
+    )
+
+    val PERFIL_ANGULO_PERIMETRAL_3M = DrywallMaterial(
+        id = "perfil_angulo_3m",
+        code = "ANGULO-L-3M",
+        name = "Perfil Ángulo L Perimetral (3.0 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_3M,
+        commercialSpec = "Perfil en L de acero galvanizado cal. 26 x 3.00 m",
+        technicalFunction = "Soporte perimetral anclado a muro para recibir estructuras de cielo raso"
+    )
+
+    val ALAMBRE_GALVANIZADO = DrywallMaterial(
+        id = "alambre_galvanizado_n12",
+        code = "ALAMBRE-GALV-KG",
+        name = "Alambre Galvanizado N° 12 (kg)",
+        category = MaterialCategory.FIJACIONES,
+        defaultUnit = UnitOfMeasure.KILOGRAMOS,
+        commercialSpec = "Alambre galvanizado de alta resistencia N° 12 para suspensión",
+        technicalFunction = "Sujeta y suspende las vigas principales del cielo raso a la losa o techo"
+    )
+
+    // Materiales para Cielo Raso en PVC
+    val TABLILLA_PVC_5_95M = DrywallMaterial(
+        id = "tablilla_pvc_5_95m",
+        code = "TABLILLA-PVC-25CM-5.95M",
+        name = "Tablilla de PVC Machihembrada (0.25 x 5.95 m)",
+        category = MaterialCategory.PLACAS,
+        defaultUnit = UnitOfMeasure.PIEZAS_5_95M,
+        commercialSpec = "Lámina de PVC machihembrada de 25 cm de ancho x 5.95 m de largo",
+        technicalFunction = "Revestimiento acabado impermeable para cielos rasos en PVC"
+    )
+
+    val CORNISA_PVC_3M = DrywallMaterial(
+        id = "cornisa_pvc_3m",
+        code = "CORNISA-PVC-3M",
+        name = "Cornisa / Moldura Perimetral PVC (3.0 m)",
+        category = MaterialCategory.ACABADOS,
+        defaultUnit = UnitOfMeasure.PIEZAS_3M,
+        commercialSpec = "Perfil perimetral en J / cornisa de PVC de 3.00 m",
+        technicalFunction = "Recibe y remata estéticamente las tablillas de PVC en todo el perímetro"
+    )
+
+    val TORNILLO_SOMBRERILLO_PVC = DrywallMaterial(
+        id = "tornillo_sombrerillo_pvc",
+        code = "TORN-SOMBRERILLO-8x1/2",
+        name = "Tornillo Sombrerillo para PVC (8 x 1/2\")",
+        category = MaterialCategory.FIJACIONES,
+        defaultUnit = UnitOfMeasure.UNIDADES,
+        commercialSpec = "Tornillo cabeza extraplana tipo sombrerillo para machihembrado de PVC",
+        technicalFunction = "Sujeta la pestaña del PVC a la estructura metálica sin dañar la lámina"
+    )
+
+    // Esquineros para Muebles
+    val ESQUINERO_PERFORADO_3M = DrywallMaterial(
+        id = "esquinero_perforado_3m",
+        code = "ESQUINERO-METAL-3M",
+        name = "Esquinero Metálico Perforado (3.0 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_3M,
+        commercialSpec = "Protector de canto metálico perforado cal. 26 x 3.00 m",
+        technicalFunction = "Protege contra impactos y define aristas rectas en esquinas exteriores de muebles"
     )
 
     // Placas de yeso según tipo
@@ -492,8 +557,451 @@ class CalculatorEngine {
         return calculate(input)
     }
 
+    /**
+     * Calcula la lista completa de insumos para un cielo raso suspendido en Drywall.
+     */
+    fun calculateDrywallCeiling(input: DrywallCeilingInput): List<MaterialRequirement> {
+        val wasteMultiplier = 1.0 + input.wasteFactor
+        val requirements = mutableListOf<MaterialRequirement>()
+
+        val length = input.lengthMeters
+        val width = input.widthMeters
+        val area = input.areaM2
+        val perimeter = input.perimeterMeters
+
+        // 1. Ángulo L Perimetral (3.0 m)
+        val angleLinearMetersWithWaste = perimeter * wasteMultiplier
+        val anglePieces3m = ceil(angleLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.PERFIL_ANGULO_PERIMETRAL_3M,
+                rawQuantity = perimeter / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = angleLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = anglePieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "Perímetro perimetral: ${perimeter.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $anglePieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 2. Omegas Secundarias (3.0 m)
+        val omegaLinesCount = ceil(length / input.omegaSpacingMeters).toInt() + 1
+        val omegaLinearMetersRaw = omegaLinesCount * width
+        val omegaLinearMetersWithWaste = omegaLinearMetersRaw * wasteMultiplier
+        val omegaPieces3m = ceil(omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.PERFIL_OMEGA_3M,
+                rawQuantity = omegaLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = omegaPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "$omegaLinesCount líneas de omega cada ${(input.omegaSpacingMeters * 100).roundToInt()} cm x ${width.format(2)} m = ${omegaLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $omegaPieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 3. Vigas Principales (Canal Guía 3.0 m)
+        val mainBeamLinesCount = ceil(width / input.mainBeamSpacingMeters).toInt() + 1
+        val mainBeamLinearMetersRaw = mainBeamLinesCount * length
+        val mainBeamLinearMetersWithWaste = mainBeamLinearMetersRaw * wasteMultiplier
+        val mainBeamPieces3m = ceil(mainBeamLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.CANAL_GUIA_3M,
+                rawQuantity = mainBeamLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = mainBeamLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = mainBeamPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "$mainBeamLinesCount vigas principales cada ${(input.mainBeamSpacingMeters * 100).roundToInt()} cm x ${length.format(2)} m = ${mainBeamLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $mainBeamPieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 4. Suspensión / Alambre Galvanizado N° 12
+        val suspensionPoints = omegaLinesCount * mainBeamLinesCount
+        val wireMetersPerPoint = input.suspensionHeightMeters + 0.20
+        val wireMetersTotal = suspensionPoints * wireMetersPerPoint
+        val wireKgTotal = ceil((wireMetersTotal / 15.0) * wasteMultiplier).toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.ALAMBRE_GALVANIZADO,
+                rawQuantity = wireMetersTotal / 15.0,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (wireMetersTotal * wasteMultiplier) / 15.0,
+                commercialQuantity = wireKgTotal,
+                unit = UnitOfMeasure.KILOGRAMOS,
+                formulaExplanation = "$suspensionPoints puntos de suspensión x ${wireMetersPerPoint.format(2)} m = ${wireMetersTotal.format(1)} m de alambre N° 12 (~15m/kg) = $wireKgTotal kg."
+            )
+        )
+
+        // 5. Placas de Yeso
+        val boardMaterial = DrywallCatalog.getBoardMaterial(input.boardType)
+        val boardsRawCount = area / BOARD_SURFACE_AREA_M2
+        val boardsWithWaste = boardsRawCount * wasteMultiplier
+        val commercialBoardsCount = ceil(boardsWithWaste).toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = boardMaterial,
+                rawQuantity = boardsRawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = boardsWithWaste,
+                commercialQuantity = commercialBoardsCount,
+                unit = UnitOfMeasure.PLACAS_ESTANDAR,
+                formulaExplanation = "Área de techo: ${area.format(2)} m² / ${BOARD_SURFACE_AREA_M2.format(2)} m² = ${boardsRawCount.format(2)} + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $commercialBoardsCount placas."
+            )
+        )
+
+        // 6. Tornillos T1 y T2
+        val t1RawCount = suspensionPoints * 2.0 + (omegaLinesCount * 2.0)
+        val t1Commercial = ceil(t1RawCount * wasteMultiplier).toInt().coerceAtLeast(40)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TORNILLO_T1,
+                rawQuantity = t1RawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = t1RawCount * wasteMultiplier,
+                commercialQuantity = t1Commercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "Fijación entre perfiles y elementos de suspensión = $t1Commercial unidades."
+            )
+        )
+
+        val t2RawCount = commercialBoardsCount * SCREWS_T2_PER_BOARD.toDouble()
+        val t2Commercial = ceil(t2RawCount * wasteMultiplier).toInt().coerceAtLeast(50)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TORNILLO_T2,
+                rawQuantity = t2RawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = t2RawCount * wasteMultiplier,
+                commercialQuantity = t2Commercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "$commercialBoardsCount placas x $SCREWS_T2_PER_BOARD tornillos/placa = $t2Commercial unidades."
+            )
+        )
+
+        // 7. Anclajes / Chazos
+        val anchorsRaw = ceil(perimeter / ANCHOR_SPACING_METERS).toInt() + suspensionPoints
+        val anchorsCommercial = ceil(anchorsRaw * wasteMultiplier).toInt().coerceAtLeast(10)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.ANCLAJE_CHAZO_TORNILLO,
+                rawQuantity = anchorsRaw.toDouble(),
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = anchorsRaw * wasteMultiplier,
+                commercialQuantity = anchorsCommercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "Anclajes perimetrales + puntos de suspensión en techo = $anchorsCommercial unidades."
+            )
+        )
+
+        // 8. Cinta de Papel
+        val tapeMetersRaw = area * TAPE_METERS_PER_M2_BOARD
+        val tapeRolls = ceil((tapeMetersRaw * wasteMultiplier) / TAPE_ROLL_COMMERCIAL_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.CINTA_PAPEL_JUNTAS,
+                rawQuantity = tapeMetersRaw / TAPE_ROLL_COMMERCIAL_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (tapeMetersRaw * wasteMultiplier) / TAPE_ROLL_COMMERCIAL_METERS,
+                commercialQuantity = tapeRolls,
+                unit = UnitOfMeasure.ROLLOS,
+                formulaExplanation = "${area.format(2)} m² x 1.5 m/m² = ${tapeMetersRaw.format(1)} m lineales ($tapeRolls rollo/s de 75m)."
+            )
+        )
+
+        // 9. Masilla
+        val compoundKgRaw = area * COMPOUND_KG_PER_M2_BOARD
+        val compoundBuckets = ceil((compoundKgRaw * wasteMultiplier) / COMPOUND_BUCKET_KG)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.MASILLA_JUNTAS_BALDE,
+                rawQuantity = compoundKgRaw / COMPOUND_BUCKET_KG,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (compoundKgRaw * wasteMultiplier) / COMPOUND_BUCKET_KG,
+                commercialQuantity = compoundBuckets,
+                unit = UnitOfMeasure.BALDES_28KG,
+                formulaExplanation = "${area.format(2)} m² x 1.0 kg/m² = ${compoundKgRaw.format(1)} kg ($compoundBuckets balde/s de 28kg)."
+            )
+        )
+
+        // 10. Aislamiento termoacústico opcional
+        if (input.hasInsulation) {
+            val insulationRolls = ceil((area * wasteMultiplier) / INSULATION_ROLL_AREA_M2)
+                .toInt().coerceAtLeast(1)
+
+            requirements.add(
+                MaterialRequirement(
+                    material = DrywallCatalog.LANA_AISLAMIENTO,
+                    rawQuantity = area / INSULATION_ROLL_AREA_M2,
+                    wastePercentage = input.wasteFactor,
+                    quantityWithWaste = (area * wasteMultiplier) / INSULATION_ROLL_AREA_M2,
+                    commercialQuantity = insulationRolls,
+                    unit = UnitOfMeasure.ROLLOS,
+                    formulaExplanation = "Área de techo: ${area.format(2)} m² ($insulationRolls rollo/s de 12 m²)."
+                )
+            )
+        }
+
+        return requirements
+    }
+
+    /**
+     * Calcula la lista completa de insumos para un cielo raso en PVC.
+     */
+    fun calculatePvcCeiling(input: PvcCeilingInput): List<MaterialRequirement> {
+        val wasteMultiplier = 1.0 + input.wasteFactor
+        val requirements = mutableListOf<MaterialRequirement>()
+
+        val area = input.areaM2
+        val perimeter = input.perimeterMeters
+
+        // 1. Tablillas PVC Machihembradas (0.25 x 5.95 m)
+        val slatArea = input.slatWidthMeters * input.commercialSlatLengthMeters
+        val slatsRawCount = area / slatArea
+        val slatsCommercialCount = ceil(slatsRawCount * wasteMultiplier).toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TABLILLA_PVC_5_95M,
+                rawQuantity = slatsRawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = slatsRawCount * wasteMultiplier,
+                commercialQuantity = slatsCommercialCount,
+                unit = UnitOfMeasure.PIEZAS_5_95M,
+                formulaExplanation = "Área de techo: ${area.format(2)} m² / área tablilla (${slatArea.format(2)} m²) = ${slatsRawCount.format(2)} + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $slatsCommercialCount piezas de 5.95 m."
+            )
+        )
+
+        // 2. Cornisa / Moldura PVC (3.0 m)
+        val corniceLinearMetersWithWaste = perimeter * wasteMultiplier
+        val cornicePieces3m = ceil(corniceLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.CORNISA_PVC_3M,
+                rawQuantity = perimeter / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = corniceLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = cornicePieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "Perímetro del ambiente: ${perimeter.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $cornicePieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 3. Estructura Portante Omega (3.0 m)
+        val supportLinesCount = ceil(input.lengthMeters / input.supportSpacingMeters).toInt() + 1
+        val supportLinearMetersRaw = supportLinesCount * input.widthMeters
+        val supportLinearMetersWithWaste = supportLinearMetersRaw * wasteMultiplier
+        val supportPieces3m = ceil(supportLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.PERFIL_OMEGA_3M,
+                rawQuantity = supportLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = supportLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = supportPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "$supportLinesCount líneas de estructura portante cada ${(input.supportSpacingMeters * 100).roundToInt()} cm x ${input.widthMeters.format(2)} m = ${supportLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $supportPieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 4. Tornillos Sombrerillo para PVC
+        val screwsRawCount = area * 15.0
+        val screwsCommercialCount = ceil(screwsRawCount * wasteMultiplier).toInt().coerceAtLeast(50)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TORNILLO_SOMBRERILLO_PVC,
+                rawQuantity = screwsRawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = screwsRawCount * wasteMultiplier,
+                commercialQuantity = screwsCommercialCount,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "${area.format(2)} m² x 15 tornillos/m² = ${screwsRawCount.roundToInt()} unidades + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $screwsCommercialCount unidades."
+            )
+        )
+
+        // 5. Anclajes / Chazos
+        val anchorsRaw = ceil(perimeter / ANCHOR_SPACING_METERS).toInt()
+        val anchorsCommercial = ceil(anchorsRaw * wasteMultiplier).toInt().coerceAtLeast(10)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.ANCLAJE_CHAZO_TORNILLO,
+                rawQuantity = anchorsRaw.toDouble(),
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = anchorsRaw * wasteMultiplier,
+                commercialQuantity = anchorsCommercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "Anclajes perimetrales cada 50 cm = $anchorsCommercial unidades."
+            )
+        )
+
+        return requirements
+    }
+
+    /**
+     * Calcula la lista completa de insumos para un mueble / repisa en Drywall.
+     */
+    fun calculateFurniture(input: FurnitureCalculationInput): List<MaterialRequirement> {
+        val wasteMultiplier = 1.0 + input.wasteFactor
+        val requirements = mutableListOf<MaterialRequirement>()
+
+        val exposedArea = input.totalExposedAreaM2
+        val cornerBeadLinearMeters = input.totalCornerBeadLinearMeters
+
+        // 1. Placas de Yeso
+        val boardMaterial = DrywallCatalog.getBoardMaterial(input.boardType)
+        val boardsRawCount = exposedArea / BOARD_SURFACE_AREA_M2
+        val boardsWithWaste = boardsRawCount * wasteMultiplier
+        val commercialBoardsCount = ceil(boardsWithWaste).toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = boardMaterial,
+                rawQuantity = boardsRawCount,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = boardsWithWaste,
+                commercialQuantity = commercialBoardsCount,
+                unit = UnitOfMeasure.PLACAS_ESTANDAR,
+                formulaExplanation = "Superficie expuesta a revestir: ${exposedArea.format(2)} m² / ${BOARD_SURFACE_AREA_M2.format(2)} m² = ${boardsRawCount.format(2)} + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $commercialBoardsCount placas."
+            )
+        )
+
+        // 2. Estructura Metálica (Canales y Postes de 3.0 m)
+        val structuralLinearMetersRaw = cornerBeadLinearMeters * 0.8
+        val structuralLinearMetersWithWaste = structuralLinearMetersRaw * wasteMultiplier
+
+        val channelPieces3m = ceil(structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+        val studPieces3m = ceil(structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.CANAL_GUIA_3M,
+                rawQuantity = structuralLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = channelPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "Estructura base de amarre e interfaz de repisas = $channelPieces3m piezas de 3.0 m."
+            )
+        )
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.POSTE_MONTANTE_3M,
+                rawQuantity = structuralLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = studPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "Refuerzos y montantes internos del mueble = $studPieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 3. Esquinero Metálico Perforado (3.0 m)
+        val cornerBeadPieces3m = ceil((cornerBeadLinearMeters * wasteMultiplier) / COMMERCIAL_PROFILE_LENGTH_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.ESQUINERO_PERFORADO_3M,
+                rawQuantity = cornerBeadLinearMeters / COMMERCIAL_PROFILE_LENGTH_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (cornerBeadLinearMeters * wasteMultiplier) / COMMERCIAL_PROFILE_LENGTH_METERS,
+                commercialQuantity = cornerBeadPieces3m,
+                unit = UnitOfMeasure.PIEZAS_3M,
+                formulaExplanation = "Protección de cantos y esquinas expuestas: ${cornerBeadLinearMeters.format(2)} m lineales + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $cornerBeadPieces3m piezas de 3.0 m."
+            )
+        )
+
+        // 4. Tornillos T1 y T2
+        val t1Commercial = ceil((channelPieces3m + studPieces3m) * 8 * wasteMultiplier).toInt().coerceAtLeast(30)
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TORNILLO_T1,
+                rawQuantity = (channelPieces3m + studPieces3m) * 8.0,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (channelPieces3m + studPieces3m) * 8.0 * wasteMultiplier,
+                commercialQuantity = t1Commercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "Unión metal a metal para armazón interno = $t1Commercial unidades."
+            )
+        )
+
+        val t2Commercial = ceil(commercialBoardsCount * 35 * wasteMultiplier).toInt().coerceAtLeast(50)
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.TORNILLO_T2,
+                rawQuantity = commercialBoardsCount * 35.0,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = commercialBoardsCount * 35.0 * wasteMultiplier,
+                commercialQuantity = t2Commercial,
+                unit = UnitOfMeasure.UNIDADES,
+                formulaExplanation = "Fijación de placas a perfilería (35 tornillos/placa por cortes pequeños) = $t2Commercial unidades."
+            )
+        )
+
+        // 5. Masilla y Cinta
+        val compoundKgRaw = exposedArea * 1.5 // Mayor masillado para asentamiento de esquineros perforados
+        val compoundBuckets = ceil((compoundKgRaw * wasteMultiplier) / COMPOUND_BUCKET_KG)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.MASILLA_JUNTAS_BALDE,
+                rawQuantity = compoundKgRaw / COMPOUND_BUCKET_KG,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = (compoundKgRaw * wasteMultiplier) / COMPOUND_BUCKET_KG,
+                commercialQuantity = compoundBuckets,
+                unit = UnitOfMeasure.BALDES_28KG,
+                formulaExplanation = "${exposedArea.format(2)} m² expuestos x 1.5 kg/m² = ${compoundKgRaw.format(1)} kg ($compoundBuckets balde/s de 28kg)."
+            )
+        )
+
+        val tapeRolls = ceil(((exposedArea * 1.5) * wasteMultiplier) / TAPE_ROLL_COMMERCIAL_METERS)
+            .toInt().coerceAtLeast(1)
+
+        requirements.add(
+            MaterialRequirement(
+                material = DrywallCatalog.CINTA_PAPEL_JUNTAS,
+                rawQuantity = (exposedArea * 1.5) / TAPE_ROLL_COMMERCIAL_METERS,
+                wastePercentage = input.wasteFactor,
+                quantityWithWaste = ((exposedArea * 1.5) * wasteMultiplier) / TAPE_ROLL_COMMERCIAL_METERS,
+                commercialQuantity = tapeRolls,
+                unit = UnitOfMeasure.ROLLOS,
+                formulaExplanation = "Tratamiento de juntas en uniones de placas = $tapeRolls rollo/s de 75m."
+            )
+        )
+
+        return requirements
+    }
+
     private fun WallCalculationInput.wastePercentageString(): String =
         "${(wasteFactor * 100).roundToInt()}%"
 
     private fun Double.format(decimals: Int): String = NumberFormatUtils.formatDecimal(this, decimals)
 }
+

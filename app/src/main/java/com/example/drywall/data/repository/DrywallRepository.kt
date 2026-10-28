@@ -4,6 +4,7 @@ import com.example.drywall.data.local.dao.ProjectDao
 import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
+import com.example.drywall.data.local.entity.WallCalculationEntity
 import com.example.drywall.data.mapper.toEntity
 import com.example.drywall.data.mapper.toOpeningEntities
 import com.example.drywall.data.mapper.toDomain
@@ -19,6 +20,11 @@ import kotlinx.coroutines.flow.map
 interface DrywallRepository {
     val allProjectsWithCalculations: Flow<List<ProjectWithCalculations>>
     fun getProjectById(projectId: Long): Flow<ProjectWithCalculations?>
+    suspend fun createEmptyProject(
+        projectName: String,
+        clientOrLocation: String = "",
+        notes: String = ""
+    ): Long
     suspend fun saveProjectWithCalculation(
         projectName: String,
         clientOrLocation: String,
@@ -30,6 +36,9 @@ interface DrywallRepository {
         projectId: Long,
         wallName: String,
         calculationResult: WallCalculationResult
+    ): Long
+    suspend fun addCalculationEntityToProject(
+        entity: WallCalculationEntity
     ): Long
     suspend fun updateProject(project: ProjectEntity)
     suspend fun deleteProject(projectId: Long)
@@ -61,6 +70,22 @@ class DrywallRepositoryImpl(
     override fun getProjectById(projectId: Long): Flow<ProjectWithCalculations?> =
         projectDao.getProjectWithCalculationsById(projectId)
 
+    override suspend fun createEmptyProject(
+        projectName: String,
+        clientOrLocation: String,
+        notes: String
+    ): Long {
+        val now = System.currentTimeMillis()
+        val project = ProjectEntity(
+            name = projectName.ifBlank { "Obra $now" },
+            clientOrLocation = clientOrLocation,
+            notes = notes,
+            createdAt = now,
+            updatedAt = now
+        )
+        return projectDao.insertProject(project)
+    }
+
     override suspend fun saveProjectWithCalculation(
         projectName: String,
         clientOrLocation: String,
@@ -79,7 +104,7 @@ class DrywallRepositoryImpl(
         val projectId = projectDao.insertProject(project)
         insertWall(
             projectId = projectId,
-            wallName = wallName.ifBlank { "Muro 1" },
+            wallName = wallName.ifBlank { "Elemento 1" },
             calculationResult = calculationResult,
             timestamp = now
         )
@@ -94,12 +119,19 @@ class DrywallRepositoryImpl(
         val now = System.currentTimeMillis()
         val wallId = insertWall(
             projectId = projectId,
-            wallName = wallName.ifBlank { "Muro Adicional" },
+            wallName = wallName.ifBlank { "Elemento Adicional" },
             calculationResult = calculationResult,
             timestamp = now
         )
         projectDao.touchProject(projectId, now)
         return wallId
+    }
+
+    override suspend fun addCalculationEntityToProject(entity: WallCalculationEntity): Long {
+        val now = System.currentTimeMillis()
+        val id = projectDao.insertCalculation(entity.copy(createdAt = now))
+        projectDao.touchProject(entity.projectId, now)
+        return id
     }
 
     override suspend fun updateProject(project: ProjectEntity) {

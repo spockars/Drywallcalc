@@ -1,6 +1,5 @@
 package com.example.drywall.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +24,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -42,7 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -63,6 +61,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.drywall.domain.model.ConstructionElementType
 import com.example.drywall.domain.model.DrywallBoardType
 import com.example.drywall.domain.model.WallFaces
 import com.example.drywall.ui.components.OpeningsCard
@@ -70,7 +69,7 @@ import com.example.drywall.ui.components.PaintCard
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 
 /**
- * Pantalla de Formulario de Cálculo de Muro Drywall con validación numérica rigurosa.
+ * Pantalla de Formulario de Cálculo de Construcción en Seco (Muro, Cielo Raso Drywall, PVC, Muebles).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,9 +86,9 @@ fun CalculationFormScreen(
             val num = text.toDoubleOrNull()
             when {
                 text.isEmpty() -> "El largo es obligatorio"
-                num == null -> "Ingresa un número válido (ej. 4.5)"
+                num == null -> "Ingresa un número válido"
                 num <= 0.0 -> "El largo debe ser mayor a 0 m"
-                num > 100.0 -> "Verifica el largo (máx. 100 m recomendado)"
+                num > 100.0 -> "Verifica el largo"
                 else -> null
             }
         }
@@ -101,9 +100,9 @@ fun CalculationFormScreen(
             val num = text.toDoubleOrNull()
             when {
                 text.isEmpty() -> "El alto es obligatorio"
-                num == null -> "Ingresa un número válido (ej. 2.6)"
+                num == null -> "Ingresa un número válido"
                 num <= 0.0 -> "El alto debe ser mayor a 0 m"
-                num > 15.0 -> "Verifica la altura (máx. 15 m)"
+                num > 15.0 -> "Verifica la altura"
                 else -> null
             }
         }
@@ -113,7 +112,6 @@ fun CalculationFormScreen(
         derivedStateOf { lengthValidation == null && heightValidation == null }
     }
 
-    // Impacto inmediato de los vanos sobre la superficie neta del muro
     val openingsAreaM2 by remember(uiState.openingDrafts) {
         derivedStateOf {
             uiState.openingDrafts.sumOf { draft ->
@@ -132,7 +130,6 @@ fun CalculationFormScreen(
         }
     }
 
-    // La pintura se calcula sobre el área neta de placa (todas las caras emplazadas)
     val paintAreaM2 by remember(netAreaM2, uiState.faces) {
         derivedStateOf { netAreaM2 * uiState.faces.factor }
     }
@@ -149,102 +146,197 @@ fun CalculationFormScreen(
         ) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    FormBannerCard()
+                    FormBannerCard(selectedType = uiState.selectedElementType)
                 }
             }
 
-            // Presets rápidos de obra
+            // Selector de Tipo de Elemento
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    PresetsRow(
-                        lengthInput = uiState.lengthInput,
-                        heightInput = uiState.heightInput,
-                        faces = uiState.faces,
-                        onApplyPreset = viewModel::applyPreset
+                    ElementTypeSelectorCard(
+                        selectedType = uiState.selectedElementType,
+                        elementName = uiState.elementNameInput,
+                        onTypeSelected = viewModel::onElementTypeSelected,
+                        onElementNameChange = viewModel::onElementNameChanged
                     )
                 }
             }
 
-            // Dimensiones con Steppers y Validación en Vivo
-            item {
-                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    DimensionsCard(
-                        lengthInput = uiState.lengthInput,
-                        heightInput = uiState.heightInput,
-                        lengthError = lengthValidation,
-                        heightError = heightValidation,
-                        onLengthChange = viewModel::onLengthChanged,
-                        onHeightChange = viewModel::onHeightChanged,
-                        onAdjustLength = viewModel::adjustLengthBy,
-                        onAdjustHeight = viewModel::adjustHeightBy
-                    )
+            when (uiState.selectedElementType) {
+                ConstructionElementType.MURO_DRYWALL -> {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            PresetsRow(
+                                lengthInput = uiState.lengthInput,
+                                heightInput = uiState.heightInput,
+                                faces = uiState.faces,
+                                onApplyPreset = viewModel::applyPreset
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            DimensionsCard(
+                                lengthInput = uiState.lengthInput,
+                                heightInput = uiState.heightInput,
+                                lengthError = lengthValidation,
+                                heightError = heightValidation,
+                                onLengthChange = viewModel::onLengthChanged,
+                                onHeightChange = viewModel::onHeightChanged,
+                                onAdjustLength = viewModel::adjustLengthBy,
+                                onAdjustHeight = viewModel::adjustHeightBy
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            OpeningsCard(
+                                drafts = uiState.openingDrafts,
+                                errors = uiState.openingsValidationErrors,
+                                openingsAreaM2 = openingsAreaM2,
+                                netAreaM2 = netAreaM2,
+                                onAddOpening = viewModel::addOpening,
+                                onClearOpenings = viewModel::clearOpenings,
+                                onRemoveOpening = viewModel::removeOpening,
+                                onTypeChange = viewModel::updateOpeningType,
+                                onWidthChange = viewModel::updateOpeningWidth,
+                                onHeightChange = viewModel::updateOpeningHeight
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            TechnicalSpecsCard(
+                                faces = uiState.faces,
+                                studSpacingMeters = uiState.studSpacingMeters,
+                                boardType = uiState.boardType,
+                                hasInsulation = uiState.hasInsulation,
+                                onFacesChange = viewModel::onFacesChanged,
+                                onStudSpacingChange = viewModel::onStudSpacingChanged,
+                                onBoardTypeChange = viewModel::onBoardTypeChanged,
+                                onInsulationToggle = viewModel::onInsulationToggled
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            PaintCard(
+                                enabled = uiState.paintEnabled,
+                                productName = uiState.paintProductNameInput,
+                                unit = uiState.paintUnit,
+                                coverageInput = uiState.paintCoverageInput,
+                                finishCoatsInput = uiState.paintFinishCoatsInput,
+                                wastePercentInput = uiState.paintWastePercentInput,
+                                errors = uiState.paintValidationErrors,
+                                paintAreaM2 = paintAreaM2,
+                                onEnabledChange = viewModel::onPaintEnabledToggled,
+                                onProductNameChange = viewModel::onPaintProductNameChanged,
+                                onUnitChange = viewModel::onPaintUnitChanged,
+                                onCoverageChange = viewModel::onPaintCoverageChanged,
+                                onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
+                                onWasteChange = viewModel::onPaintWasteChanged
+                            )
+                        }
+                    }
+                }
+
+                ConstructionElementType.CIELO_RASO_DRYWALL -> {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            CeilingDimensionsCard(
+                                lengthInput = uiState.lengthInput,
+                                widthInput = uiState.ceilingWidthInput,
+                                suspensionInput = uiState.suspensionHeightInput,
+                                onLengthChange = viewModel::onLengthChanged,
+                                onWidthChange = viewModel::onCeilingWidthChanged,
+                                onSuspensionChange = viewModel::onSuspensionHeightChanged
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            TechnicalSpecsCard(
+                                faces = WallFaces.ONE_FACE,
+                                studSpacingMeters = uiState.studSpacingMeters,
+                                boardType = uiState.boardType,
+                                hasInsulation = uiState.hasInsulation,
+                                onFacesChange = {},
+                                onStudSpacingChange = viewModel::onStudSpacingChanged,
+                                onBoardTypeChange = viewModel::onBoardTypeChanged,
+                                onInsulationToggle = viewModel::onInsulationToggled
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            PaintCard(
+                                enabled = uiState.paintEnabled,
+                                productName = uiState.paintProductNameInput,
+                                unit = uiState.paintUnit,
+                                coverageInput = uiState.paintCoverageInput,
+                                finishCoatsInput = uiState.paintFinishCoatsInput,
+                                wastePercentInput = uiState.paintWastePercentInput,
+                                errors = uiState.paintValidationErrors,
+                                paintAreaM2 = paintAreaM2,
+                                onEnabledChange = viewModel::onPaintEnabledToggled,
+                                onProductNameChange = viewModel::onPaintProductNameChanged,
+                                onUnitChange = viewModel::onPaintUnitChanged,
+                                onCoverageChange = viewModel::onPaintCoverageChanged,
+                                onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
+                                onWasteChange = viewModel::onPaintWasteChanged
+                            )
+                        }
+                    }
+                }
+
+                ConstructionElementType.CIELO_RASO_PVC -> {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            PvcCeilingDimensionsCard(
+                                lengthInput = uiState.lengthInput,
+                                widthInput = uiState.ceilingWidthInput,
+                                slatWidthInput = uiState.pvcSlatWidthInput,
+                                slatLengthInput = uiState.pvcCommercialSlatLengthInput,
+                                onLengthChange = viewModel::onLengthChanged,
+                                onWidthChange = viewModel::onCeilingWidthChanged,
+                                onSlatWidthChange = viewModel::onPvcSlatWidthChanged,
+                                onSlatLengthChange = viewModel::onPvcCommercialSlatLengthChanged
+                            )
+                        }
+                    }
+                }
+
+                ConstructionElementType.MUEBLE_DRYWALL -> {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                            FurnitureDimensionsCard(
+                                widthInput = uiState.furnitureWidthInput,
+                                heightInput = uiState.furnitureHeightInput,
+                                depthInput = uiState.furnitureDepthInput,
+                                shelvesInput = uiState.horizontalShelvesCountInput,
+                                dividersInput = uiState.verticalDividersCountInput,
+                                onWidthChange = viewModel::onFurnitureWidthChanged,
+                                onHeightChange = viewModel::onFurnitureHeightChanged,
+                                onDepthChange = viewModel::onFurnitureDepthChanged,
+                                onShelvesChange = viewModel::onHorizontalShelvesCountChanged,
+                                onDividersChange = viewModel::onVerticalDividersCountChanged
+                            )
+                        }
+                    }
                 }
             }
 
-            // Vanos (puertas y ventanas) del muro
-            item {
-                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    OpeningsCard(
-                        drafts = uiState.openingDrafts,
-                        errors = uiState.openingsValidationErrors,
-                        openingsAreaM2 = openingsAreaM2,
-                        netAreaM2 = netAreaM2,
-                        onAddOpening = viewModel::addOpening,
-                        onClearOpenings = viewModel::clearOpenings,
-                        onRemoveOpening = viewModel::removeOpening,
-                        onTypeChange = viewModel::updateOpeningType,
-                        onWidthChange = viewModel::updateOpeningWidth,
-                        onHeightChange = viewModel::updateOpeningHeight
-                    )
-                }
-            }
-
-            // Configuración Técnica del Muro
-            item {
-                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    TechnicalSpecsCard(
-                        faces = uiState.faces,
-                        studSpacingMeters = uiState.studSpacingMeters,
-                        boardType = uiState.boardType,
-                        hasInsulation = uiState.hasInsulation,
-                        onFacesChange = viewModel::onFacesChanged,
-                        onStudSpacingChange = viewModel::onStudSpacingChanged,
-                        onBoardTypeChange = viewModel::onBoardTypeChanged,
-                        onInsulationToggle = viewModel::onInsulationToggled
-                    )
-                }
-            }
-
-            // Pintura del muro (sellador + manos de acabado)
-            item {
-                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    PaintCard(
-                        enabled = uiState.paintEnabled,
-                        productName = uiState.paintProductNameInput,
-                        unit = uiState.paintUnit,
-                        coverageInput = uiState.paintCoverageInput,
-                        finishCoatsInput = uiState.paintFinishCoatsInput,
-                        wastePercentInput = uiState.paintWastePercentInput,
-                        errors = uiState.paintValidationErrors,
-                        paintAreaM2 = paintAreaM2,
-                        onEnabledChange = viewModel::onPaintEnabledToggled,
-                        onProductNameChange = viewModel::onPaintProductNameChanged,
-                        onUnitChange = viewModel::onPaintUnitChanged,
-                        onCoverageChange = viewModel::onPaintCoverageChanged,
-                        onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
-                        onWasteChange = viewModel::onPaintWasteChanged
-                    )
-                }
-            }
-
-            // Botón de Acción Principal para Calcular y Ver Resultados
+            // Botón de Acción Principal para Calcular
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
                     Button(
                         onClick = { viewModel.calculateAndGoToResults() },
-                        enabled = isFormValid &&
-                            uiState.openingsValidationErrors.isEmpty() &&
-                            uiState.paintValidationErrors.isEmpty(),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -257,7 +349,7 @@ fun CalculationFormScreen(
                         Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Calcular y Ver Desglose de Materiales",
+                            text = "Calcular y Ver Desglose",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -270,8 +362,278 @@ fun CalculationFormScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FormBannerCard() {
+fun ElementTypeSelectorCard(
+    selectedType: ConstructionElementType,
+    elementName: String,
+    onTypeSelected: (ConstructionElementType) -> Unit,
+    onElementNameChange: (String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Tipo de Elemento",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ConstructionElementType.entries.forEach { type ->
+                    val icon = when (type) {
+                        ConstructionElementType.MURO_DRYWALL -> Icons.Default.Layers
+                        ConstructionElementType.CIELO_RASO_DRYWALL -> Icons.Default.Straighten
+                        ConstructionElementType.CIELO_RASO_PVC -> Icons.Default.GridView
+                        ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Layers
+                    }
+                    FilterChip(
+                        selected = selectedType == type,
+                        onClick = { onTypeSelected(type) },
+                        label = { Text(type.displayName) },
+                        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = elementName,
+                onValueChange = onElementNameChange,
+                label = { Text("Nombre o Ubicación del Elemento") },
+                placeholder = { Text("ej. Pared Principal / Techo Baño / Mueble TV") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun CeilingDimensionsCard(
+    lengthInput: String,
+    widthInput: String,
+    suspensionInput: String,
+    onLengthChange: (String) -> Unit,
+    onWidthChange: (String) -> Unit,
+    onSuspensionChange: (String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Dimensiones del Cielo Raso (m)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            OutlinedTextField(
+                value = lengthInput,
+                onValueChange = onLengthChange,
+                label = { Text("Largo del Techo (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            OutlinedTextField(
+                value = widthInput,
+                onValueChange = onWidthChange,
+                label = { Text("Ancho del Techo (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            OutlinedTextField(
+                value = suspensionInput,
+                onValueChange = onSuspensionChange,
+                label = { Text("Altura de Descolgado / Suspensión (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun PvcCeilingDimensionsCard(
+    lengthInput: String,
+    widthInput: String,
+    slatWidthInput: String,
+    slatLengthInput: String,
+    onLengthChange: (String) -> Unit,
+    onWidthChange: (String) -> Unit,
+    onSlatWidthChange: (String) -> Unit,
+    onSlatLengthChange: (String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Dimensiones Cielo Raso PVC (m)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            OutlinedTextField(
+                value = lengthInput,
+                onValueChange = onLengthChange,
+                label = { Text("Largo del Techo (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            OutlinedTextField(
+                value = widthInput,
+                onValueChange = onWidthChange,
+                label = { Text("Ancho del Techo (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = slatWidthInput,
+                    onValueChange = onSlatWidthChange,
+                    label = { Text("Ancho Tablilla (m)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = slatLengthInput,
+                    onValueChange = onSlatLengthChange,
+                    label = { Text("Largo Comercial (m)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FurnitureDimensionsCard(
+    widthInput: String,
+    heightInput: String,
+    depthInput: String,
+    shelvesInput: String,
+    dividersInput: String,
+    onWidthChange: (String) -> Unit,
+    onHeightChange: (String) -> Unit,
+    onDepthChange: (String) -> Unit,
+    onShelvesChange: (String) -> Unit,
+    onDividersChange: (String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Dimensiones del Mueble / Repisa (m)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = widthInput,
+                    onValueChange = onWidthChange,
+                    label = { Text("Ancho (m)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = heightInput,
+                    onValueChange = onHeightChange,
+                    label = { Text("Alto (m)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+
+            OutlinedTextField(
+                value = depthInput,
+                onValueChange = onDepthChange,
+                label = { Text("Profundidad (m)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = shelvesInput,
+                    onValueChange = onShelvesChange,
+                    label = { Text("N° Repisas Horiz.") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = dividersInput,
+                    onValueChange = onDividersChange,
+                    label = { Text("N° Divisores Vert.") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FormBannerCard(selectedType: ConstructionElementType) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -294,7 +656,12 @@ fun FormBannerCard() {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.Straighten,
+                            imageVector = when (selectedType) {
+                                ConstructionElementType.MURO_DRYWALL -> Icons.Default.Layers
+                                ConstructionElementType.CIELO_RASO_DRYWALL -> Icons.Default.Straighten
+                                ConstructionElementType.CIELO_RASO_PVC -> Icons.Default.GridView
+                                ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Layers
+                            },
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(22.dp)
@@ -304,12 +671,12 @@ fun FormBannerCard() {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Formulario de Cálculo",
+                        text = selectedType.displayName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Ingresa las medidas netas del muro",
+                        text = selectedType.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -401,7 +768,6 @@ fun DimensionsCard(
                 fontWeight = FontWeight.Bold
             )
 
-            // Largo con Steppers
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "Largo del muro (m)",
@@ -453,7 +819,6 @@ fun DimensionsCard(
                 }
             }
 
-            // Alto con Steppers
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "Alto del muro (m)",
@@ -539,7 +904,6 @@ fun TechnicalSpecsCard(
                 fontWeight = FontWeight.Bold
             )
 
-            // Caras emplacadas
             Text(
                 text = "Caras emplacadas",
                 style = MaterialTheme.typography.labelMedium,
@@ -565,7 +929,6 @@ fun TechnicalSpecsCard(
 
             HorizontalDivider()
 
-            // Separación de postes
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -600,7 +963,6 @@ fun TechnicalSpecsCard(
 
             HorizontalDivider()
 
-            // Tipo de placa
             Text(
                 text = "Tipo de Placa",
                 style = MaterialTheme.typography.labelMedium,
@@ -621,7 +983,6 @@ fun TechnicalSpecsCard(
                 }
             }
 
-            // Switch de Aislamiento
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -127,3 +127,40 @@ private fun WallCalculationResult.buildSummaryNotes(): String = buildString {
         append(", Pintura: ${it.totalUnits} ${it.unitLabelForTotal}")
     }
 }
+
+/** Reconstruye la entrada de cálculo de un cielo raso en drywall persistido. */
+fun WallCalculationEntity.toDrywallCeilingInput(): com.example.drywall.domain.model.DrywallCeilingInput =
+    com.example.drywall.domain.model.DrywallCeilingInput(
+        lengthMeters = lengthMeters,
+        widthMeters = heightMeters,
+        suspensionHeightMeters = suspensionHeightMeters,
+        omegaSpacingMeters = studSpacingMeters,
+        mainBeamSpacingMeters = mainBeamSpacingMeters,
+        boardType = runCatching { DrywallBoardType.valueOf(boardType) }.getOrDefault(DrywallBoardType.ESTANDAR_ST),
+        hasInsulation = hasInsulation,
+        wasteFactor = wasteFactor
+    )
+
+/** Reconstruye la entrada de cálculo de un cielo raso en PVC persistido. */
+fun WallCalculationEntity.toPvcCeilingInput(): com.example.drywall.domain.model.PvcCeilingInput =
+    com.example.drywall.domain.model.PvcCeilingInput(
+        lengthMeters = lengthMeters,
+        widthMeters = heightMeters,
+        slatWidthMeters = slatWidthMeters,
+        commercialSlatLengthMeters = commercialSlatLengthMeters,
+        supportSpacingMeters = studSpacingMeters,
+        wasteFactor = wasteFactor
+    )
+
+/** Reconstruye la entrada de cálculo de un mueble en drywall persistido. */
+fun WallCalculationEntity.toFurnitureInput(): com.example.drywall.domain.model.FurnitureCalculationInput =
+    com.example.drywall.domain.model.FurnitureCalculationInput(
+        widthMeters = lengthMeters,
+        heightMeters = heightMeters,
+        depthMeters = depthMeters,
+        horizontalShelvesCount = horizontalShelvesCount,
+        verticalDividersCount = verticalDividersCount,
+        boardType = runCatching { DrywallBoardType.valueOf(boardType) }.getOrDefault(DrywallBoardType.ESTANDAR_ST),
+        wasteFactor = wasteFactor
+    )
+

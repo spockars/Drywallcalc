@@ -1,17 +1,20 @@
 package com.example.drywall.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Entidad Room para almacenar el cómputo métrico de un muro dentro de un proyecto.
+ * Entidad Room para almacenar el cómputo métrico de un elemento (muro, cielo raso o mueble) dentro de un proyecto.
  * Incluye clave foránea a [ProjectEntity] con eliminación en cascada.
  *
- * Desde la versión 2 de la base guarda además el área neta emplazable (descontando vanos)
- * y el resultado de pintura del muro, para que al recargar el proyecto el cálculo se
- * reproduzca exactamente igual.
+ * Desde la versión 4 soporta múltiples tipos de elementos (`elementType`):
+ * - MURO_DRYWALL
+ * - CIELO_RASO_DRYWALL
+ * - CIELO_RASO_PVC
+ * - MUEBLE_DRYWALL
  */
 @Entity(
     tableName = "wall_calculations",
@@ -29,7 +32,7 @@ data class WallCalculationEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val projectId: Long,
-    val wallName: String = "Muro Drywall",
+    val wallName: String = "Elemento Drywall",
     val lengthMeters: Double,
     val heightMeters: Double,
     val faces: String, // ONE_FACE or BOTH_FACES
@@ -54,5 +57,23 @@ data class WallCalculationEntity(
     val paintCoverageM2PerUnit: Double = 0.0,
     val paintAreaM2: Double = 0.0,
     val paintSealerUnits: Int = 0,
-    val paintFinishUnits: Int = 0
+    val paintFinishUnits: Int = 0,
+    // --- Campos agregados en versión 4 para soportes de cielos rasos, PVC y muebles ---
+    @ColumnInfo(defaultValue = "MURO_DRYWALL")
+    val elementType: String = "MURO_DRYWALL",
+    @ColumnInfo(defaultValue = "0.30")
+    val suspensionHeightMeters: Double = 0.30,
+    @ColumnInfo(defaultValue = "0.80")
+    val mainBeamSpacingMeters: Double = 0.80,
+    @ColumnInfo(defaultValue = "0.25")
+    val slatWidthMeters: Double = 0.25,
+    @ColumnInfo(defaultValue = "5.95")
+    val commercialSlatLengthMeters: Double = 5.95,
+    @ColumnInfo(defaultValue = "0")
+    val horizontalShelvesCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val verticalDividersCount: Int = 0,
+    @ColumnInfo(defaultValue = "0.0")
+    val depthMeters: Double = 0.0
 )
+

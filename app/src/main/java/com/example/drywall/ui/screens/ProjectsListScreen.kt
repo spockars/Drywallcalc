@@ -592,8 +592,15 @@ fun ProjectCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            val elementBadge = when (calc.elementType) {
+                                "CIELO_RASO_DRYWALL" -> "☁️ Cielo Raso Drywall"
+                                "CIELO_RASO_PVC" -> "🪟 Cielo Raso PVC"
+                                "MUEBLE_DRYWALL" -> "🛋️ Mueble Drywall"
+                                else -> "🧱 Muro Drywall"
+                            }
+
                             Text(
-                                text = calc.wallName,
+                                text = "${calc.wallName} ($elementBadge)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -611,7 +618,7 @@ fun ProjectCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "${calc.totalBoardsCount} placas • " +
+                                text = "${calc.totalBoardsCount} placas/tablillas • " +
                                     "${calc.totalProfiles3mCount} perfiles 3m" +
                                     if (calc.totalPaintUnits > 0) " • ${calc.totalPaintUnits} envases pintura" else "",
                                 style = MaterialTheme.typography.labelSmall,
