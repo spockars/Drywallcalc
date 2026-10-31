@@ -25,3 +25,6 @@ debug.keystore
 /USER.md
 /TOOLS.md
 /HEARTBEAT.md
+.agents/
+.idea/
+*-capability.json
