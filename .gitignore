@@ -28,3 +28,9 @@ debug.keystore
 .agents/
 .idea/
 *-capability.json
+/.artifacts/
+/.cluster/
+/.opencode/
+/metadata.json
+/config/
+
