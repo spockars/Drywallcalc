@@ -11,37 +11,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SteelBlueDarkPrimary,
-    onPrimary = SteelBlueDarkOnPrimary,
-    primaryContainer = SteelBlueDarkPrimaryContainer,
-    onPrimaryContainer = SteelBlueDarkOnPrimaryContainer,
-    secondary = ConstructionAmberDarkSecondary,
-    onSecondary = ConstructionAmberDarkOnSecondary,
-    secondaryContainer = ConstructionAmberDarkSecondaryContainer,
-    onSecondaryContainer = ConstructionAmberDarkOnSecondaryContainer,
-    tertiary = MineralTealDarkTertiary,
-    onTertiary = MineralTealDarkOnTertiary,
-    tertiaryContainer = MineralTealDarkTertiaryContainer,
-    onTertiaryContainer = MineralTealDarkOnTertiaryContainer
+    primary = ProBlueDarkPrimary,
+    onPrimary = ProBlueDarkOnPrimary,
+    primaryContainer = ProBlueDarkPrimaryContainer,
+    onPrimaryContainer = ProBlueDarkOnPrimaryContainer,
+    secondary = ProAmberDarkSecondary,
+    onSecondary = ProAmberDarkOnSecondary,
+    secondaryContainer = ProAmberDarkSecondaryContainer,
+    onSecondaryContainer = ProAmberDarkOnSecondaryContainer,
+    background = ProBackgroundDark,
+    surface = ProSurfaceDark,
+    onSurface = ProOnSurfaceDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = SteelBlueLightPrimary,
-    onPrimary = SteelBlueLightOnPrimary,
-    primaryContainer = SteelBlueLightPrimaryContainer,
-    onPrimaryContainer = SteelBlueLightOnPrimaryContainer,
-    secondary = ConstructionAmberLightSecondary,
-    secondaryContainer = ConstructionAmberLightSecondaryContainer,
-    onSecondaryContainer = ConstructionAmberLightOnSecondaryContainer,
-    tertiary = MineralTealLightTertiary,
-    tertiaryContainer = MineralTealLightTertiaryContainer,
-    onTertiaryContainer = MineralTealLightOnTertiaryContainer
+    primary = ProBluePrimary,
+    onPrimary = ProBlueOnPrimary,
+    primaryContainer = ProBluePrimaryContainer,
+    onPrimaryContainer = ProBlueOnPrimaryContainer,
+    secondary = ProAmberSecondary,
+    onSecondary = ProAmberSecondary,
+    secondaryContainer = ProAmberSecondaryContainer,
+    onSecondaryContainer = ProAmberOnSecondaryContainer,
+    background = ProBackgroundLight,
+    surface = ProSurfaceLight,
+    onSurface = ProOnSurfaceLight
 )
 
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Curated professional palette by default
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

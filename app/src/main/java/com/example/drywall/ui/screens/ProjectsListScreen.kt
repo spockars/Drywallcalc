@@ -102,7 +102,7 @@ fun ProjectsListScreen(
             ExtendedFloatingActionButton(
                 onClick = { viewModel.navigateTo(AppScreen.DASHBOARD) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Nuevo Cómputo") },
+                text = { Text("Nuevo Proyecto") },
                 modifier = Modifier.testTag("new_computation_fab")
             )
         }

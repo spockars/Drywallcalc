@@ -34,6 +34,8 @@ class CostCalculatorTest {
     private val engine = CalculatorEngine()
 
     private val precios = mapOf(
+        "canal_guia_2_44m" to PriceEntry("canal_guia_2_44m", 20_000.0),
+        "poste_montante_2_44m" to PriceEntry("poste_montante_2_44m", 18_000.0),
         "canal_guia_3m" to PriceEntry("canal_guia_3m", 20_000.0),
         "poste_montante_3m" to PriceEntry("poste_montante_3m", 18_000.0),
         "placa_st_12_7" to PriceEntry("placa_st_12_7", 62_000.0),

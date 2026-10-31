@@ -2,32 +2,32 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta Técnica para Construcción en Seco (Drywall)
-val SteelBlueLightPrimary = Color(0xFF00658E)
-val SteelBlueLightOnPrimary = Color(0xFFFFFFFF)
-val SteelBlueLightPrimaryContainer = Color(0xFFC7E7FF)
-val SteelBlueLightOnPrimaryContainer = Color(0xFF001E2E)
+// Pro Industrial & Blue Palette
+val ProBluePrimary = Color(0xFF1E3A8A) // Deep Slate / Royal Blue
+val ProBlueOnPrimary = Color(0xFFFFFFFF)
+val ProBluePrimaryContainer = Color(0xFFDBEAFE)
+val ProBlueOnPrimaryContainer = Color(0xFF1E40AF)
 
-val ConstructionAmberLightSecondary = Color(0xFF904D00)
-val ConstructionAmberLightSecondaryContainer = Color(0xFFFFDCC1)
-val ConstructionAmberLightOnSecondaryContainer = Color(0xFF2E1500)
+val ProAmberSecondary = Color(0xFFF59E0B) // Construction Amber
+val ProAmberOnSecondary = Color(0xFFFFFFFF)
+val ProAmberSecondaryContainer = Color(0xFFFEF3C7)
+val ProAmberOnSecondaryContainer = Color(0xFF92400E)
 
-val MineralTealLightTertiary = Color(0xFF006A60)
-val MineralTealLightTertiaryContainer = Color(0xFF72F8E5)
-val MineralTealLightOnTertiaryContainer = Color(0xFF00201C)
+val ProBackgroundLight = Color(0xFFF1F5F9)
+val ProSurfaceLight = Color(0xFFFFFFFF)
+val ProOnSurfaceLight = Color(0xFF0F172A)
 
-// Tema Oscuro
-val SteelBlueDarkPrimary = Color(0xFF84CFFF)
-val SteelBlueDarkOnPrimary = Color(0xFF00344C)
-val SteelBlueDarkPrimaryContainer = Color(0xFF004C6C)
-val SteelBlueDarkOnPrimaryContainer = Color(0xFFC7E7FF)
+// Dark Theme
+val ProBlueDarkPrimary = Color(0xFF93C5FD)
+val ProBlueDarkOnPrimary = Color(0xFF1E3A8A)
+val ProBlueDarkPrimaryContainer = Color(0xFF1D4ED8)
+val ProBlueDarkOnPrimaryContainer = Color(0xFFDBEAFE)
 
-val ConstructionAmberDarkSecondary = Color(0xFFFFB77B)
-val ConstructionAmberDarkOnSecondary = Color(0xFF4D2600)
-val ConstructionAmberDarkSecondaryContainer = Color(0xFF6E3900)
-val ConstructionAmberDarkOnSecondaryContainer = Color(0xFFFFDCC1)
+val ProAmberDarkSecondary = Color(0xFFFBBF24)
+val ProAmberDarkOnSecondary = Color(0xFF78350F)
+val ProAmberDarkSecondaryContainer = Color(0xFFD97706)
+val ProAmberDarkOnSecondaryContainer = Color(0xFFFEF3C7)
 
-val MineralTealDarkTertiary = Color(0xFF51DBC9)
-val MineralTealDarkOnTertiary = Color(0xFF003731)
-val MineralTealDarkTertiaryContainer = Color(0xFF005048)
-val MineralTealDarkOnTertiaryContainer = Color(0xFF72F8E5)
+val ProBackgroundDark = Color(0xFF0F172A)
+val ProSurfaceDark = Color(0xFF1E293B)
+val ProOnSurfaceDark = Color(0xFFF8FAFC)

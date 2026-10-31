@@ -55,16 +55,16 @@ class CalculatorEngineTest {
 
         // 2. Canales / Soleras (piso y techo):
         // 5.0 m * 2 = 10.0 m lineales. Con 8% desperdicio = 10.8 m.
-        // En perfiles comerciales de 3.0 m: ceil(10.8 / 3.0) = 4 piezas de 3.0 m.
-        val trackReq = result.requirements.first { it.material.id == "canal_guia_3m" }
-        assertEquals(4, trackReq.commercialQuantity)
-        assertEquals(UnitOfMeasure.PIEZAS_3M, trackReq.unit)
+        // En perfiles comerciales de 2.44 m (estándar Colombia): ceil(10.8 / 2.44) = 5 piezas.
+        val trackReq = result.requirements.first { it.material.id.startsWith("canal_guia") }
+        assertEquals(5, trackReq.commercialQuantity)
+        assertEquals(UnitOfMeasure.PIEZAS_2_44M, trackReq.unit)
 
         // 3. Postes / Montantes verticales:
-        // Largo 5.0 / 0.407 = ~12.28 -> 13 + 1 (arranque) = 14 postes.
-        // Con 8% de desperdicio: 14 * 1.08 = 15.12 -> ceil = 16 piezas comerciales de 3.0 m.
-        val studReq = result.requirements.first { it.material.id == "poste_montante_3m" }
-        assertEquals(16, studReq.commercialQuantity)
+        // Largo 5.0 / 0.407 = ~12.28 -> 13 + 1 (arranque) = 14 postes * 2.6m = 36.4m * 1.08 = 39.31m.
+        // En perfiles comerciales de 2.44 m: ceil(39.31 / 2.44) = 17 piezas.
+        val studReq = result.requirements.first { it.material.id.startsWith("poste_montante") }
+        assertEquals(17, studReq.commercialQuantity)
 
         // 4. Aislamiento termoacústico:
         // Área 13.0 m² * 1.08 = 14.04 m². Rollos de 12 m²: ceil(14.04 / 12) = 2 rollos.

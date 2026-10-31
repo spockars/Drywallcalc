@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Payments
@@ -66,7 +68,21 @@ fun DrywallCalculatorScreen(
             NavigationBar(
                 modifier = Modifier.testTag("main_navigation_bar")
             ) {
-                // Tab 1: Proyectos guardados en Room
+                // Tab 1: Inicio / Dashboard (Tarjetas Visuales)
+                NavigationBarItem(
+                    selected = uiState.currentScreen == AppScreen.DASHBOARD || uiState.currentScreen == AppScreen.CALCULATOR,
+                    onClick = { viewModel.navigateTo(AppScreen.DASHBOARD) },
+                    icon = {
+                        Icon(
+                            imageVector = if (uiState.currentScreen == AppScreen.DASHBOARD || uiState.currentScreen == AppScreen.CALCULATOR) Icons.Filled.GridView else Icons.Outlined.GridView,
+                            contentDescription = "Inicio"
+                        )
+                    },
+                    label = { Text("Inicio") },
+                    modifier = Modifier.testTag("nav_tab_dashboard")
+                )
+
+                // Tab 2: Proyectos guardados
                 NavigationBarItem(
                     selected = uiState.currentScreen == AppScreen.PROJECTS,
                     onClick = { viewModel.navigateTo(AppScreen.PROJECTS) },
@@ -88,35 +104,7 @@ fun DrywallCalculatorScreen(
                     modifier = Modifier.testTag("nav_tab_projects")
                 )
 
-                // Tab 2: Formulario de cálculo
-                NavigationBarItem(
-                    selected = uiState.currentScreen == AppScreen.CALCULATOR,
-                    onClick = { viewModel.navigateTo(AppScreen.CALCULATOR) },
-                    icon = {
-                        Icon(
-                            imageVector = if (uiState.currentScreen == AppScreen.CALCULATOR) Icons.Filled.Calculate else Icons.Outlined.Calculate,
-                            contentDescription = "Calculadora"
-                        )
-                    },
-                    label = { Text("Calculadora") },
-                    modifier = Modifier.testTag("nav_tab_calculator")
-                )
-
-                // Tab 3: Desglose de resultados
-                NavigationBarItem(
-                    selected = uiState.currentScreen == AppScreen.RESULTS,
-                    onClick = { viewModel.navigateTo(AppScreen.RESULTS) },
-                    icon = {
-                        Icon(
-                            imageVector = if (uiState.currentScreen == AppScreen.RESULTS) Icons.Filled.ReceiptLong else Icons.Outlined.ReceiptLong,
-                            contentDescription = "Resultados"
-                        )
-                    },
-                    label = { Text("Resultados") },
-                    modifier = Modifier.testTag("nav_tab_results")
-                )
-
-                // Tab 4: Catálogo de precios unitarios
+                // Tab 3: Catálogo de precios unitarios
                 NavigationBarItem(
                     selected = uiState.currentScreen == AppScreen.PRICES,
                     onClick = { viewModel.navigateTo(AppScreen.PRICES) },
@@ -132,6 +120,20 @@ fun DrywallCalculatorScreen(
                     },
                     label = { Text("Precios") },
                     modifier = Modifier.testTag("nav_tab_prices")
+                )
+
+                // Tab 4: Desglose de resultados
+                NavigationBarItem(
+                    selected = uiState.currentScreen == AppScreen.RESULTS,
+                    onClick = { viewModel.navigateTo(AppScreen.RESULTS) },
+                    icon = {
+                        Icon(
+                            imageVector = if (uiState.currentScreen == AppScreen.RESULTS) Icons.Filled.ReceiptLong else Icons.Outlined.ReceiptLong,
+                            contentDescription = "Resultados"
+                        )
+                    },
+                    label = { Text("Resultados") },
+                    modifier = Modifier.testTag("nav_tab_results")
                 )
             }
         }

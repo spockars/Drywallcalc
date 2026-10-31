@@ -1,6 +1,5 @@
 package com.example.drywall.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,15 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.CardDefaults
@@ -45,7 +42,7 @@ import com.example.drywall.ui.viewmodel.AppScreen
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 
 /**
- * Pantalla inicial de selección de elemento a calcular (Dashboard de Construcción en Seco).
+ * Pantalla inicial de selección de elemento a calcular (Dashboard en cuadrícula 2x2).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +56,7 @@ fun ElementDashboardScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Selecciona el Tipo de Obra",
+                        text = "DrywallCalc Pro",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -79,6 +76,7 @@ fun ElementDashboardScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Saludo de bienvenida
             item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
                     ElevatedCard(
@@ -90,14 +88,14 @@ fun ElementDashboardScreen(
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
                             Text(
-                                text = "🛠️ Nuevo Cómputo de Materiales",
+                                text = "¡Hola, Constructor! 👋",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Elige el elemento constructivo que deseas cuantificar. Podrás agregarlo a tu obra actual o iniciar un nuevo presupuesto.",
+                                text = "Selecciona el tipo de elemento que deseas calcular hoy para iniciar tu presupuesto.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -106,15 +104,42 @@ fun ElementDashboardScreen(
                 }
             }
 
-            items(ConstructionElementType.entries) { elementType ->
+            item {
                 Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    ElementCard(
-                        elementType = elementType,
-                        onClick = {
-                            viewModel.onElementTypeSelected(elementType)
-                            viewModel.navigateTo(AppScreen.CALCULATOR)
-                        }
+                    Text(
+                        text = "Elementos de Construcción",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
+                }
+            }
+
+            // Cuadrícula 2x2 de Tarjetas Visuales Grandes
+            val elements = ConstructionElementType.entries.toList()
+            val chunks = elements.chunked(2)
+
+            items(chunks.size) { rowIndex ->
+                val rowElements = chunks[rowIndex]
+                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        rowElements.forEach { elementType ->
+                            Box(modifier = Modifier.weight(1f)) {
+                                VisualGridCard(
+                                    elementType = elementType,
+                                    onClick = {
+                                        viewModel.onElementTypeSelected(elementType)
+                                        viewModel.navigateTo(AppScreen.CALCULATOR)
+                                    }
+                                )
+                            }
+                        }
+                        if (rowElements.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         }
@@ -122,7 +147,7 @@ fun ElementDashboardScreen(
 }
 
 @Composable
-fun ElementCard(
+fun VisualGridCard(
     elementType: ConstructionElementType,
     onClick: () -> Unit
 ) {
@@ -130,12 +155,13 @@ fun ElementCard(
         ConstructionElementType.MURO_DRYWALL -> Icons.Default.Layers
         ConstructionElementType.CIELO_RASO_DRYWALL -> Icons.Default.Straighten
         ConstructionElementType.CIELO_RASO_PVC -> Icons.Default.GridView
-        ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Layers
+        ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Kitchen
     }
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
+            .height(160.dp)
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
@@ -143,60 +169,39 @@ fun ElementCard(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = elementType.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = elementType.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(36.dp)
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
+                        imageVector = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(18.dp)
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
+            }
+            Column {
+                Text(
+                    text = elementType.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = elementType.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
             }
         }
     }

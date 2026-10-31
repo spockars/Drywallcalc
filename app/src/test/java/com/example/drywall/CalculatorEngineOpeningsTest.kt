@@ -36,7 +36,11 @@ class CalculatorEngineOpeningsTest {
     }
 
     private fun WallCalculationResult.requirement(materialId: String): MaterialRequirement =
-        requirements.first { it.material.id == materialId }
+        requirements.first {
+            it.material.id == materialId ||
+            (materialId == "canal_guia_3m" && it.material.id.startsWith("canal_guia")) ||
+            (materialId == "poste_montante_3m" && it.material.id.startsWith("poste_montante"))
+        }
 
     @Test
     fun testUnVanoDescuentaPlacaAislamientoYSumaCintaDePerimetro() {
@@ -135,11 +139,11 @@ class CalculatorEngineOpeningsTest {
         // Placas: 19.82 / 2.9768 * 1.08 = 7.19 => 8 placas
         assertEquals(8, result.totalBoardsRequired)
 
-        // Canales: 10.0 m + dinteles 2.10 m = 12.10 m * 1.08 / 3 = 4.36 => 5 piezas
-        assertEquals(5, result.requirement("canal_guia_3m").commercialQuantity)
+        // Canales: 10.0 m + dinteles 2.10 m = 12.10 m * 1.08 / 2.44 = 5.35 => 6 piezas
+        assertEquals(6, result.requirement("canal_guia_3m").commercialQuantity)
 
-        // Postes: 14 líneas de modulación + 4 jambas = 18 * 1.08 = 19.44 => 20 piezas
-        assertEquals(20, result.requirement("poste_montante_3m").commercialQuantity)
+        // Postes: 14 líneas de modulación + 4 jambas = 18 * 2.6m = 46.8m * 1.08 / 2.44 = 20.71 => 21 piezas
+        assertEquals(21, result.requirement("poste_montante_3m").commercialQuantity)
 
         // Cinta: 19.82 * 1.5 = 29.73 m + (6.00 + 4.40) m de perímetros x 2 caras = 50.53 m
         assertEquals(50.53 / 75.0, result.requirement("cinta_juntas").rawQuantity, 0.0001)

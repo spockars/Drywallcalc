@@ -20,11 +20,52 @@ import kotlin.math.roundToInt
  * Catálogo estándar de insumos para construcción liviana en seco (Drywall).
  */
 object DrywallCatalog {
-    // Estructura metálica
+    // Estructura metálica 2.44 m (Estándar Colombia)
+    val CANAL_GUIA_2_44M = DrywallMaterial(
+        id = "canal_guia_2_44m",
+        code = "CANAL-60-2.44M",
+        name = "Canal / Solera Guía (60 mm x 2.44 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_2_44M,
+        commercialSpec = "Perfil de acero galvanizado cal. 26 x 2.44 m (base para piso y techo)",
+        technicalFunction = "Guía horizontal anclada a piso y losa para recibir los montantes verticales"
+    )
+
+    val POSTE_MONTANTE_2_44M = DrywallMaterial(
+        id = "poste_montante_2_44m",
+        code = "POSTE-59-2.44M",
+        name = "Poste / Parante / Montante (59 mm x 2.44 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_2_44M,
+        commercialSpec = "Perfil de acero galvanizado cal. 26 x 2.44 m con perforaciones para ductos",
+        technicalFunction = "Estructura vertical portante que recibe las placas de yeso fijadas con tornillos"
+    )
+
+    val PERFIL_OMEGA_2_44M = DrywallMaterial(
+        id = "perfil_omega_2_44m",
+        code = "OMEGA-2.44M",
+        name = "Perfil Omega Rigidizador (2.44 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_2_44M,
+        commercialSpec = "Perfil omega galvanizado cal. 26 x 2.44 m",
+        technicalFunction = "Refuerzo y arriostramiento horizontal intermedio para muros o trasdosados"
+    )
+
+    val PERFIL_ANGULO_PERIMETRAL_2_44M = DrywallMaterial(
+        id = "perfil_angulo_2_44m",
+        code = "ANGULO-L-2.44M",
+        name = "Perfil Ángulo L Perimetral (2.44 m)",
+        category = MaterialCategory.ESTRUCTURA,
+        defaultUnit = UnitOfMeasure.PIEZAS_2_44M,
+        commercialSpec = "Perfil en L de acero galvanizado cal. 26 x 2.44 m",
+        technicalFunction = "Soporte perimetral anclado a muro para recibir estructuras de cielo raso"
+    )
+
+    // Estructura metálica 3.00 m (Industrial)
     val CANAL_GUIA_3M = DrywallMaterial(
         id = "canal_guia_3m",
         code = "CANAL-60-3M",
-        name = "Canal / Solera Guía (60 mm)",
+        name = "Canal / Solera Guía (60 mm x 3.0 m)",
         category = MaterialCategory.ESTRUCTURA,
         defaultUnit = UnitOfMeasure.PIEZAS_3M,
         commercialSpec = "Perfil de acero galvanizado cal. 26 x 3.00 m (base para piso y techo)",
@@ -34,7 +75,7 @@ object DrywallCatalog {
     val POSTE_MONTANTE_3M = DrywallMaterial(
         id = "poste_montante_3m",
         code = "POSTE-59-3M",
-        name = "Poste / Parante / Montante (59 mm)",
+        name = "Poste / Parante / Montante (59 mm x 3.0 m)",
         category = MaterialCategory.ESTRUCTURA,
         defaultUnit = UnitOfMeasure.PIEZAS_3M,
         commercialSpec = "Perfil de acero galvanizado cal. 26 x 3.00 m con perforaciones para ductos",
@@ -44,7 +85,7 @@ object DrywallCatalog {
     val PERFIL_OMEGA_3M = DrywallMaterial(
         id = "perfil_omega_3m",
         code = "OMEGA-3M",
-        name = "Perfil Omega Rigidizador",
+        name = "Perfil Omega Rigidizador (3.0 m)",
         category = MaterialCategory.ESTRUCTURA,
         defaultUnit = UnitOfMeasure.PIEZAS_3M,
         commercialSpec = "Perfil omega galvanizado cal. 26 x 3.00 m",
@@ -60,6 +101,18 @@ object DrywallCatalog {
         commercialSpec = "Perfil en L de acero galvanizado cal. 26 x 3.00 m",
         technicalFunction = "Soporte perimetral anclado a muro para recibir estructuras de cielo raso"
     )
+
+    fun getTrackMaterial(lengthMeters: Double): DrywallMaterial =
+        if (lengthMeters <= 2.50) CANAL_GUIA_2_44M else CANAL_GUIA_3M
+
+    fun getStudMaterial(lengthMeters: Double): DrywallMaterial =
+        if (lengthMeters <= 2.50) POSTE_MONTANTE_2_44M else POSTE_MONTANTE_3M
+
+    fun getOmegaMaterial(lengthMeters: Double): DrywallMaterial =
+        if (lengthMeters <= 2.50) PERFIL_OMEGA_2_44M else PERFIL_OMEGA_3M
+
+    fun getAngleMaterial(lengthMeters: Double): DrywallMaterial =
+        if (lengthMeters <= 2.50) PERFIL_ANGULO_PERIMETRAL_2_44M else PERFIL_ANGULO_PERIMETRAL_3M
 
     val ALAMBRE_GALVANIZADO = DrywallMaterial(
         id = "alambre_galvanizado_n12",
@@ -275,29 +328,30 @@ class CalculatorEngine {
         // =========================================================================
         // 1. CANAL / GUÍA SUPERIOR E INFERIOR (Piso y Techo)
         // =========================================================================
-        // El muro requiere canal a lo largo en la base (piso) y en la coronación (techo).
-        // Un canal por vano hace las veces de dintel sobre la abertura.
+        val profileLen = input.commercialProfileLengthMeters
         val headersLinearMetersRaw = input.headersLinearMeters
         val trackLinearMetersRaw = length * 2.0 + headersLinearMetersRaw
         val trackLinearMetersWithWaste = trackLinearMetersRaw * wasteMultiplier
-        val trackPieces3m = ceil(trackLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val trackPieces = ceil(trackLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
+
+        val profileUnit = if (profileLen <= 2.50) UnitOfMeasure.PIEZAS_2_44M else UnitOfMeasure.PIEZAS_3M
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.CANAL_GUIA_3M,
-                rawQuantity = trackLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getTrackMaterial(profileLen),
+                rawQuantity = trackLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = trackLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = trackPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
+                quantityWithWaste = trackLinearMetersWithWaste / profileLen,
+                commercialQuantity = trackPieces,
+                unit = profileUnit,
                 formulaExplanation = buildString {
                     append("Canal piso + techo: ${(length * 2.0).format(2)} m")
                     if (input.openings.isNotEmpty()) {
                         append(" + dinteles de vano: ${headersLinearMetersRaw.format(2)} m (1 canal por vano)")
                     }
                     append(" = ${trackLinearMetersRaw.format(2)} m lineales base + ${input.wastePercentageString()} desperdicio")
-                    append(" = ${trackLinearMetersWithWaste.format(2)} m. Comerciales: $trackPieces3m piezas de 3.0m.")
+                    append(" = ${trackLinearMetersWithWaste.format(2)} m. Comerciales: $trackPieces piezas de ${profileLen.format(2)}m.")
                 }
             )
         )
@@ -305,35 +359,31 @@ class CalculatorEngine {
         // =========================================================================
         // 2. POSTES / PARANTES VERTICALES (Separación típica 0.407 m o 0.61 m)
         // =========================================================================
-        // Número de líneas verticales = división del largo entre modulación + 1 (arranque inicial)
         val modulationStudLinesCount = ceil(length / studSpacing).toInt() + 1
-        // Cada vano exige dos postes de jamba, uno a cada lado de la abertura.
         val studLinesCount = modulationStudLinesCount + input.jambStudsCount
         val studLinearMetersRaw = studLinesCount * height
         val studLinearMetersWithWaste = studLinearMetersRaw * wasteMultiplier
 
-        val studPieces3m = if (height <= COMMERCIAL_PROFILE_LENGTH_METERS) {
-            // Cada línea de poste requiere 1 pieza completa de 3m (sin empalmes)
+        val studPieces = if (height <= profileLen) {
             ceil(studLinesCount * wasteMultiplier).toInt().coerceAtLeast(studLinesCount)
         } else {
-            // Para muros de más de 3m, se empalman perfiles comerciales de 3m
-            ceil(studLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS).toInt()
+            ceil(studLinearMetersWithWaste / profileLen).toInt()
         }
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.POSTE_MONTANTE_3M,
+                material = DrywallCatalog.getStudMaterial(profileLen),
                 rawQuantity = studLinesCount.toDouble(),
                 wastePercentage = input.wasteFactor,
                 quantityWithWaste = studLinesCount * wasteMultiplier,
-                commercialQuantity = studPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
+                commercialQuantity = studPieces,
+                unit = profileUnit,
                 formulaExplanation = buildString {
                     append("$studLinesCount líneas verticales a cada ${(studSpacing * 100).roundToInt()} cm x ${height.format(2)} m de alto")
                     if (input.openings.isNotEmpty()) {
                         append(" ($modulationStudLinesCount por modulación + ${input.jambStudsCount} postes de jamba en ${input.openings.size} vano/s)")
                     }
-                    append(". Con ${input.wastePercentageString()} desperdicio = $studPieces3m piezas de 3.0m.")
+                    append(". Con ${input.wastePercentageString()} desperdicio = $studPieces piezas de ${profileLen.format(2)}m.")
                 }
             )
         )
@@ -342,20 +392,20 @@ class CalculatorEngine {
         // 3. PERFIL OMEGA (Rigidizador para muros de gran altura > 2.6 m)
         // =========================================================================
         if (height > 2.60) {
-            val omegaLinearMetersRaw = length // Una fila horizontal intermedia de arriostramiento
+            val omegaLinearMetersRaw = length
             val omegaLinearMetersWithWaste = omegaLinearMetersRaw * wasteMultiplier
-            val omegaPieces3m = ceil(omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+            val omegaPieces = ceil(omegaLinearMetersWithWaste / profileLen)
                 .toInt().coerceAtLeast(1)
 
             requirements.add(
                 MaterialRequirement(
-                    material = DrywallCatalog.PERFIL_OMEGA_3M,
-                    rawQuantity = omegaLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                    material = DrywallCatalog.getOmegaMaterial(profileLen),
+                    rawQuantity = omegaLinearMetersRaw / profileLen,
                     wastePercentage = input.wasteFactor,
-                    quantityWithWaste = omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                    commercialQuantity = omegaPieces3m,
-                    unit = UnitOfMeasure.PIEZAS_3M,
-                    formulaExplanation = "Rigidizador intermedio por altura > 2.60m (${length.format(2)} m lineales + ${input.wastePercentageString()} desperdicio) = $omegaPieces3m piezas de 3.0m."
+                    quantityWithWaste = omegaLinearMetersWithWaste / profileLen,
+                    commercialQuantity = omegaPieces,
+                    unit = profileUnit,
+                    formulaExplanation = "Rigidizador intermedio por altura > 2.60m (${length.format(2)} m lineales + ${input.wastePercentageString()} desperdicio) = $omegaPieces piezas de ${profileLen.format(2)}m."
                 )
             )
         }
@@ -569,58 +619,61 @@ class CalculatorEngine {
         val area = input.areaM2
         val perimeter = input.perimeterMeters
 
-        // 1. Ángulo L Perimetral (3.0 m)
+        val profileLen = 2.44
+        val profileUnit = UnitOfMeasure.PIEZAS_2_44M
+
+        // 1. Ángulo L Perimetral
         val angleLinearMetersWithWaste = perimeter * wasteMultiplier
-        val anglePieces3m = ceil(angleLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val anglePieces = ceil(angleLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.PERFIL_ANGULO_PERIMETRAL_3M,
-                rawQuantity = perimeter / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getAngleMaterial(profileLen),
+                rawQuantity = perimeter / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = angleLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = anglePieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "Perímetro perimetral: ${perimeter.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $anglePieces3m piezas de 3.0 m."
+                quantityWithWaste = angleLinearMetersWithWaste / profileLen,
+                commercialQuantity = anglePieces,
+                unit = profileUnit,
+                formulaExplanation = "Perímetro perimetral: ${perimeter.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $anglePieces piezas de ${profileLen.format(2)} m."
             )
         )
 
-        // 2. Omegas Secundarias (3.0 m)
+        // 2. Omegas Secundarias
         val omegaLinesCount = ceil(length / input.omegaSpacingMeters).toInt() + 1
         val omegaLinearMetersRaw = omegaLinesCount * width
         val omegaLinearMetersWithWaste = omegaLinearMetersRaw * wasteMultiplier
-        val omegaPieces3m = ceil(omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val omegaPieces = ceil(omegaLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.PERFIL_OMEGA_3M,
-                rawQuantity = omegaLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getOmegaMaterial(profileLen),
+                rawQuantity = omegaLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = omegaLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = omegaPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "$omegaLinesCount líneas de omega cada ${(input.omegaSpacingMeters * 100).roundToInt()} cm x ${width.format(2)} m = ${omegaLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $omegaPieces3m piezas de 3.0 m."
+                quantityWithWaste = omegaLinearMetersWithWaste / profileLen,
+                commercialQuantity = omegaPieces,
+                unit = profileUnit,
+                formulaExplanation = "$omegaLinesCount líneas de omega cada ${(input.omegaSpacingMeters * 100).roundToInt()} cm x ${width.format(2)} m = ${omegaLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $omegaPieces piezas de ${profileLen.format(2)} m."
             )
         )
 
-        // 3. Vigas Principales (Canal Guía 3.0 m)
+        // 3. Vigas Principales (Canal Guía)
         val mainBeamLinesCount = ceil(width / input.mainBeamSpacingMeters).toInt() + 1
         val mainBeamLinearMetersRaw = mainBeamLinesCount * length
         val mainBeamLinearMetersWithWaste = mainBeamLinearMetersRaw * wasteMultiplier
-        val mainBeamPieces3m = ceil(mainBeamLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val mainBeamPieces = ceil(mainBeamLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.CANAL_GUIA_3M,
-                rawQuantity = mainBeamLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getTrackMaterial(profileLen),
+                rawQuantity = mainBeamLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = mainBeamLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = mainBeamPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "$mainBeamLinesCount vigas principales cada ${(input.mainBeamSpacingMeters * 100).roundToInt()} cm x ${length.format(2)} m = ${mainBeamLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $mainBeamPieces3m piezas de 3.0 m."
+                quantityWithWaste = mainBeamLinearMetersWithWaste / profileLen,
+                commercialQuantity = mainBeamPieces,
+                unit = profileUnit,
+                formulaExplanation = "$mainBeamLinesCount vigas principales cada ${(input.mainBeamSpacingMeters * 100).roundToInt()} cm x ${length.format(2)} m = ${mainBeamLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $mainBeamPieces piezas de ${profileLen.format(2)} m."
             )
         )
 
@@ -806,22 +859,23 @@ class CalculatorEngine {
             )
         )
 
-        // 3. Estructura Portante Omega (3.0 m)
+        // 3. Estructura Portante Omega (2.44 m)
+        val profileLen = 2.44
         val supportLinesCount = ceil(input.lengthMeters / input.supportSpacingMeters).toInt() + 1
         val supportLinearMetersRaw = supportLinesCount * input.widthMeters
         val supportLinearMetersWithWaste = supportLinearMetersRaw * wasteMultiplier
-        val supportPieces3m = ceil(supportLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val supportPieces = ceil(supportLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.PERFIL_OMEGA_3M,
-                rawQuantity = supportLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getOmegaMaterial(profileLen),
+                rawQuantity = supportLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = supportLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = supportPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "$supportLinesCount líneas de estructura portante cada ${(input.supportSpacingMeters * 100).roundToInt()} cm x ${input.widthMeters.format(2)} m = ${supportLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $supportPieces3m piezas de 3.0 m."
+                quantityWithWaste = supportLinearMetersWithWaste / profileLen,
+                commercialQuantity = supportPieces,
+                unit = UnitOfMeasure.PIEZAS_2_44M,
+                formulaExplanation = "$supportLinesCount líneas de estructura portante cada ${(input.supportSpacingMeters * 100).roundToInt()} cm x ${input.widthMeters.format(2)} m = ${supportLinearMetersRaw.format(2)} m + ${(input.wasteFactor * 100).roundToInt()}% desperdicio = $supportPieces piezas de ${profileLen.format(2)} m."
             )
         )
 
@@ -888,36 +942,37 @@ class CalculatorEngine {
             )
         )
 
-        // 2. Estructura Metálica (Canales y Postes de 3.0 m)
+        // 2. Estructura Metálica (Canales y Postes de 2.44 m)
+        val profileLen = 2.44
         val structuralLinearMetersRaw = cornerBeadLinearMeters * 0.8
         val structuralLinearMetersWithWaste = structuralLinearMetersRaw * wasteMultiplier
 
-        val channelPieces3m = ceil(structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val channelPieces = ceil(structuralLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
-        val studPieces3m = ceil(structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS)
+        val studPieces = ceil(structuralLinearMetersWithWaste / profileLen)
             .toInt().coerceAtLeast(1)
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.CANAL_GUIA_3M,
-                rawQuantity = structuralLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getTrackMaterial(profileLen),
+                rawQuantity = structuralLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = channelPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "Estructura base de amarre e interfaz de repisas = $channelPieces3m piezas de 3.0 m."
+                quantityWithWaste = structuralLinearMetersWithWaste / profileLen,
+                commercialQuantity = channelPieces,
+                unit = UnitOfMeasure.PIEZAS_2_44M,
+                formulaExplanation = "Estructura base de amarre e interfaz de repisas = $channelPieces piezas de ${profileLen.format(2)} m."
             )
         )
 
         requirements.add(
             MaterialRequirement(
-                material = DrywallCatalog.POSTE_MONTANTE_3M,
-                rawQuantity = structuralLinearMetersRaw / COMMERCIAL_PROFILE_LENGTH_METERS,
+                material = DrywallCatalog.getStudMaterial(profileLen),
+                rawQuantity = structuralLinearMetersRaw / profileLen,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = structuralLinearMetersWithWaste / COMMERCIAL_PROFILE_LENGTH_METERS,
-                commercialQuantity = studPieces3m,
-                unit = UnitOfMeasure.PIEZAS_3M,
-                formulaExplanation = "Refuerzos y montantes internos del mueble = $studPieces3m piezas de 3.0 m."
+                quantityWithWaste = structuralLinearMetersWithWaste / profileLen,
+                commercialQuantity = studPieces,
+                unit = UnitOfMeasure.PIEZAS_2_44M,
+                formulaExplanation = "Refuerzos y montantes internos del mueble = $studPieces piezas de ${profileLen.format(2)} m."
             )
         )
 
@@ -938,13 +993,13 @@ class CalculatorEngine {
         )
 
         // 4. Tornillos T1 y T2
-        val t1Commercial = ceil((channelPieces3m + studPieces3m) * 8 * wasteMultiplier).toInt().coerceAtLeast(30)
+        val t1Commercial = ceil((channelPieces + studPieces) * 8 * wasteMultiplier).toInt().coerceAtLeast(30)
         requirements.add(
             MaterialRequirement(
                 material = DrywallCatalog.TORNILLO_T1,
-                rawQuantity = (channelPieces3m + studPieces3m) * 8.0,
+                rawQuantity = (channelPieces + studPieces) * 8.0,
                 wastePercentage = input.wasteFactor,
-                quantityWithWaste = (channelPieces3m + studPieces3m) * 8.0 * wasteMultiplier,
+                quantityWithWaste = (channelPieces + studPieces) * 8.0 * wasteMultiplier,
                 commercialQuantity = t1Commercial,
                 unit = UnitOfMeasure.UNIDADES,
                 formulaExplanation = "Unión metal a metal para armazón interno = $t1Commercial unidades."

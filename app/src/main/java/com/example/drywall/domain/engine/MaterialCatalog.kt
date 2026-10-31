@@ -5,13 +5,20 @@ import com.example.drywall.domain.model.DrywallMaterial
 
 /**
  * Catálogo completo de insumos cotizables, en el orden en que se muestran en la pantalla de
- * precios. Incluye las tres placas porque cada tipo tiene su propio precio comercial.
+ * precios. Incluye perfiles de 2.44 m (estándar Colombia) y de 3.0 m (industrial).
  */
 val ALL_DRYWALL_MATERIALS: List<DrywallMaterial> = listOf(
+    // Estructura 2.44 m (Estándar Colombia)
+    DrywallCatalog.CANAL_GUIA_2_44M,
+    DrywallCatalog.POSTE_MONTANTE_2_44M,
+    DrywallCatalog.PERFIL_OMEGA_2_44M,
+    DrywallCatalog.PERFIL_ANGULO_PERIMETRAL_2_44M,
+    // Estructura 3.0 m (Industrial)
     DrywallCatalog.CANAL_GUIA_3M,
     DrywallCatalog.POSTE_MONTANTE_3M,
     DrywallCatalog.PERFIL_OMEGA_3M,
     DrywallCatalog.PERFIL_ANGULO_PERIMETRAL_3M,
+    // Fijaciones y accesorios
     DrywallCatalog.ALAMBRE_GALVANIZADO,
     DrywallCatalog.TABLILLA_PVC_5_95M,
     DrywallCatalog.CORNISA_PVC_3M,

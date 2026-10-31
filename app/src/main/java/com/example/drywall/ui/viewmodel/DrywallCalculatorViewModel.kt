@@ -33,6 +33,7 @@ import com.example.drywall.domain.model.PriceCatalogItem
 import com.example.drywall.domain.model.PriceEntry
 import com.example.drywall.domain.model.PriceKeys
 import com.example.drywall.domain.model.ProfileGauge
+import com.example.drywall.domain.model.ProfileLength
 import com.example.drywall.domain.model.ProfileWidth
 import com.example.drywall.domain.model.ProjectLabor
 import com.example.drywall.domain.model.PvcCeilingInput
@@ -75,7 +76,7 @@ data class WallOpeningDraft(
  * Estado completo de la interfaz de usuario para la calculadora y persistencia de Drywall.
  */
 data class DrywallCalculatorUiState(
-    val currentScreen: AppScreen = AppScreen.CALCULATOR,
+    val currentScreen: AppScreen = AppScreen.DASHBOARD,
     val selectedElementType: ConstructionElementType = ConstructionElementType.MURO_DRYWALL,
     val elementNameInput: String = "Elemento 1",
     // Form Inputs - Muro
@@ -104,6 +105,7 @@ data class DrywallCalculatorUiState(
     val verticalDividersCountInput: String = "1",
     val profileWidth: ProfileWidth = ProfileWidth.MM_60,
     val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
+    val profileLength: ProfileLength = ProfileLength.METERS_2_44,
     // Pintura (calculador separado del motor de drywall)
     val paintEnabled: Boolean = false,
     val paintProductNameInput: String = "",
@@ -894,6 +896,11 @@ class DrywallCalculatorViewModel(
         calculateMaterials()
     }
 
+    fun onProfileLengthChanged(length: ProfileLength) {
+        _uiState.update { it.copy(profileLength = length) }
+        calculateMaterials()
+    }
+
     fun onPaintWasteChanged(value: String) {
         _uiState.update { it.copy(paintWastePercentInput = value) }
         calculateMaterials()
@@ -1143,6 +1150,9 @@ class DrywallCalculatorViewModel(
                         studSpacingMeters = current.studSpacingMeters,
                         boardType = current.boardType,
                         wasteFactor = wasteFactor,
+                        profileWidth = current.profileWidth,
+                        profileGauge = current.profileGauge,
+                        commercialProfileLengthMeters = current.profileLength.meters,
                         openings = openings
                     )
 

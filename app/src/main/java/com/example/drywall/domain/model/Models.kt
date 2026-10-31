@@ -33,6 +33,7 @@ enum class MaterialCategory(val displayName: String, val iconName: String) {
  */
 enum class UnitOfMeasure(val symbol: String, val singularName: String, val pluralName: String) {
     UNIDADES("unid", "unidad", "unidades"),
+    PIEZAS_2_44M("piezas", "pieza de 2.44 m", "piezas de 2.44 m"),
     PIEZAS_3M("piezas", "pieza de 3.0 m", "piezas de 3.0 m"),
     PIEZAS_5_95M("piezas", "pieza de 5.95 m", "piezas de 5.95 m"),
     PLACAS_ESTANDAR("placas", "placa (1.22 x 2.44 m)", "placas (1.22 x 2.44 m)"),
@@ -153,6 +154,14 @@ enum class ProfileGauge(val code: String, val displayName: String, val descripti
 }
 
 /**
+ * Longitudes comerciales de perfiles metálicos en Colombia y Latinoamérica.
+ */
+enum class ProfileLength(val meters: Double, val displayName: String) {
+    METERS_2_44(2.44, "2.44 m (8 pies - Estándar Colombia)"),
+    METERS_3_00(3.00, "3.00 m (Industrial / Estándar)")
+}
+
+/**
  * Parámetros de entrada para el cálculo de un muro en seco.
  */
 data class WallCalculationInput(
@@ -165,6 +174,7 @@ data class WallCalculationInput(
     val wasteFactor: Double = 0.08,
     val profileWidth: ProfileWidth = ProfileWidth.MM_60,
     val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
+    val commercialProfileLengthMeters: Double = 2.44,
     val openings: List<WallOpening> = emptyList()
 ) {
     init {

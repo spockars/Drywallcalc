@@ -1,6 +1,6 @@
 package com.example.drywall.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Security
@@ -38,14 +41,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,7 +51,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import com.example.drywall.domain.model.ConstructionElementType
 import com.example.drywall.domain.model.DrywallBoardType
 import com.example.drywall.domain.model.ProfileGauge
+import com.example.drywall.domain.model.ProfileLength
 import com.example.drywall.domain.model.ProfileWidth
 import com.example.drywall.domain.model.WallFaces
 import com.example.drywall.ui.components.OpeningsCard
@@ -71,7 +72,7 @@ import com.example.drywall.ui.components.PaintCard
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
 
 /**
- * Pantalla de Formulario de Cálculo de Construcción en Seco (Muro, Cielo Raso Drywall, PVC, Muebles).
+ * Pantalla de Formulario de Cálculo con Tarjetas Modulares y Acordeones Colapsables.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +81,12 @@ fun CalculationFormScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Estados de acordeón para las tarjetas modulares (Dimensiones expandida por defecto)
+    var isDimensionsExpanded by remember { mutableStateOf(true) }
+    var isOpeningsExpanded by remember { mutableStateOf(false) }
+    var isSpecsExpanded by remember { mutableStateOf(false) }
+    var isPaintExpanded by remember { mutableStateOf(false) }
 
     // Validación numérica en tiempo real
     val lengthValidation by remember(uiState.lengthInput) {
@@ -136,13 +143,60 @@ fun CalculationFormScreen(
         derivedStateOf { netAreaM2 * uiState.faces.factor }
     }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            // Sticky Bottom Summary Bar en tiempo real
+            Surface(
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Área Neta: ${String.format(java.util.Locale.getDefault(), "%.2f", netAreaM2)} m²",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (uiState.selectedElementType == ConstructionElementType.MURO_DRYWALL) 
+                                "Pintura: ${String.format(java.util.Locale.getDefault(), "%.2f", paintAreaM2)} m²" 
+                            else "Cálculo activo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.calculateAndGoToResults() },
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = isFormValid,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("calculate_and_view_results_button")
+                    ) {
+                        Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Calcular", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -169,83 +223,243 @@ fun CalculationFormScreen(
                     item {
                         Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
                             PresetsRow(
-                                lengthInput = uiState.lengthInput,
-                                heightInput = uiState.heightInput,
-                                faces = uiState.faces,
                                 onApplyPreset = viewModel::applyPreset
                             )
                         }
                     }
 
+                    // Acordeón 1: Dimensiones (Expandido por defecto)
                     item {
                         Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            DimensionsCard(
-                                lengthInput = uiState.lengthInput,
-                                heightInput = uiState.heightInput,
-                                lengthError = lengthValidation,
-                                heightError = heightValidation,
-                                onLengthChange = viewModel::onLengthChanged,
-                                onHeightChange = viewModel::onHeightChanged,
-                                onAdjustLength = viewModel::adjustLengthBy,
-                                onAdjustHeight = viewModel::adjustHeightBy
-                            )
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isDimensionsExpanded = !isDimensionsExpanded },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Straighten, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Column {
+                                                Text("1. Dimensiones Principales", fontWeight = FontWeight.Bold)
+                                                if (!isDimensionsExpanded) {
+                                                    Text(
+                                                        "Largo: ${uiState.lengthInput}m • Alto: ${uiState.heightInput}m (${uiState.faces.label})",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isDimensionsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null
+                                        )
+                                    }
+
+                                    if (isDimensionsExpanded) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        DimensionsCard(
+                                            lengthInput = uiState.lengthInput,
+                                            heightInput = uiState.heightInput,
+                                            lengthError = lengthValidation,
+                                            heightError = heightValidation,
+                                            onLengthChange = viewModel::onLengthChanged,
+                                            onHeightChange = viewModel::onHeightChanged,
+                                            onAdjustLength = viewModel::adjustLengthBy,
+                                            onAdjustHeight = viewModel::adjustHeightBy
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
+                    // Acordeón 2: Aberturas (Colapsado por defecto)
                     item {
                         Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            OpeningsCard(
-                                drafts = uiState.openingDrafts,
-                                errors = uiState.openingsValidationErrors,
-                                openingsAreaM2 = openingsAreaM2,
-                                netAreaM2 = netAreaM2,
-                                onAddOpening = viewModel::addOpening,
-                                onClearOpenings = viewModel::clearOpenings,
-                                onRemoveOpening = viewModel::removeOpening,
-                                onTypeChange = viewModel::updateOpeningType,
-                                onWidthChange = viewModel::updateOpeningWidth,
-                                onHeightChange = viewModel::updateOpeningHeight
-                            )
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isOpeningsExpanded = !isOpeningsExpanded },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Column {
+                                                Text("2. Aberturas y Vanos", fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    if (uiState.openingDrafts.isEmpty()) "Sin aberturas registradas" 
+                                                    else "${uiState.openingDrafts.size} abertura(s) (-${String.format(java.util.Locale.getDefault(), "%.2f", openingsAreaM2)} m²)",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isOpeningsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null
+                                        )
+                                    }
+
+                                    if (isOpeningsExpanded) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        OpeningsCard(
+                                            drafts = uiState.openingDrafts,
+                                            errors = uiState.openingsValidationErrors,
+                                            openingsAreaM2 = openingsAreaM2,
+                                            netAreaM2 = netAreaM2,
+                                            onAddOpening = viewModel::addOpening,
+                                            onClearOpenings = viewModel::clearOpenings,
+                                            onRemoveOpening = viewModel::removeOpening,
+                                            onTypeChange = viewModel::updateOpeningType,
+                                            onWidthChange = viewModel::updateOpeningWidth,
+                                            onHeightChange = viewModel::updateOpeningHeight
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
+                    // Acordeón 3: Especificaciones Técnicas (Colapsado por defecto)
                     item {
                         Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            TechnicalSpecsCard(
-                                faces = uiState.faces,
-                                studSpacingMeters = uiState.studSpacingMeters,
-                                boardType = uiState.boardType,
-                                hasInsulation = uiState.hasInsulation,
-                                profileWidth = uiState.profileWidth,
-                                profileGauge = uiState.profileGauge,
-                                onFacesChange = viewModel::onFacesChanged,
-                                onStudSpacingChange = viewModel::onStudSpacingChanged,
-                                onBoardTypeChange = viewModel::onBoardTypeChanged,
-                                onInsulationToggle = viewModel::onInsulationToggled,
-                                onProfileWidthChange = viewModel::onProfileWidthChanged,
-                                onProfileGaugeChange = viewModel::onProfileGaugeChanged
-                            )
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isSpecsExpanded = !isSpecsExpanded },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Column {
+                                                Text("3. Especificaciones Técnicas", fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    "${uiState.boardType.displayName} • ${uiState.profileLength.displayName} • Stud ${uiState.profileWidth.displayName} • ${uiState.profileGauge.displayName}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isSpecsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null
+                                        )
+                                    }
+
+                                    if (isSpecsExpanded) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        TechnicalSpecsCard(
+                                            faces = uiState.faces,
+                                            boardType = uiState.boardType,
+                                            hasInsulation = uiState.hasInsulation,
+                                            profileWidth = uiState.profileWidth,
+                                            profileGauge = uiState.profileGauge,
+                                            profileLength = uiState.profileLength,
+                                            onFacesChange = viewModel::onFacesChanged,
+                                            onBoardTypeChange = viewModel::onBoardTypeChanged,
+                                            onInsulationToggle = viewModel::onInsulationToggled,
+                                            onProfileWidthChange = viewModel::onProfileWidthChanged,
+                                            onProfileGaugeChange = viewModel::onProfileGaugeChanged,
+                                            onProfileLengthChange = viewModel::onProfileLengthChanged
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
+                    // Acordeón 4: Pintura y Acabados (Colapsado por defecto)
                     item {
                         Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            PaintCard(
-                                enabled = uiState.paintEnabled,
-                                productName = uiState.paintProductNameInput,
-                                unit = uiState.paintUnit,
-                                coverageInput = uiState.paintCoverageInput,
-                                finishCoatsInput = uiState.paintFinishCoatsInput,
-                                wastePercentInput = uiState.paintWastePercentInput,
-                                errors = uiState.paintValidationErrors,
-                                paintAreaM2 = paintAreaM2,
-                                onEnabledChange = viewModel::onPaintEnabledToggled,
-                                onProductNameChange = viewModel::onPaintProductNameChanged,
-                                onUnitChange = viewModel::onPaintUnitChanged,
-                                onCoverageChange = viewModel::onPaintCoverageChanged,
-                                onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
-                                onWasteChange = viewModel::onPaintWasteChanged
-                            )
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isPaintExpanded = !isPaintExpanded },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Calculate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Column {
+                                                Text("4. Acabados y Pintura", fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    if (uiState.paintEnabled) "Habilitado (${String.format(java.util.Locale.getDefault(), "%.2f", paintAreaM2)} m² a pintar)" else "Deshabilitado",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isPaintExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null
+                                        )
+                                    }
+
+                                    if (isPaintExpanded) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        HorizontalDivider()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        PaintCard(
+                                            enabled = uiState.paintEnabled,
+                                            productName = uiState.paintProductNameInput,
+                                            unit = uiState.paintUnit,
+                                            coverageInput = uiState.paintCoverageInput,
+                                            finishCoatsInput = uiState.paintFinishCoatsInput,
+                                            wastePercentInput = uiState.paintWastePercentInput,
+                                            errors = uiState.paintValidationErrors,
+                                            paintAreaM2 = paintAreaM2,
+                                            onEnabledChange = viewModel::onPaintEnabledToggled,
+                                            onProductNameChange = viewModel::onPaintProductNameChanged,
+                                            onUnitChange = viewModel::onPaintUnitChanged,
+                                            onCoverageChange = viewModel::onPaintCoverageChanged,
+                                            onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
+                                            onWasteChange = viewModel::onPaintWasteChanged
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -260,46 +474,6 @@ fun CalculationFormScreen(
                                 onLengthChange = viewModel::onLengthChanged,
                                 onWidthChange = viewModel::onCeilingWidthChanged,
                                 onSuspensionChange = viewModel::onSuspensionHeightChanged
-                            )
-                        }
-                    }
-
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            TechnicalSpecsCard(
-                                faces = WallFaces.ONE_FACE,
-                                studSpacingMeters = uiState.studSpacingMeters,
-                                boardType = uiState.boardType,
-                                hasInsulation = uiState.hasInsulation,
-                                profileWidth = uiState.profileWidth,
-                                profileGauge = uiState.profileGauge,
-                                onFacesChange = {},
-                                onStudSpacingChange = viewModel::onStudSpacingChanged,
-                                onBoardTypeChange = viewModel::onBoardTypeChanged,
-                                onInsulationToggle = viewModel::onInsulationToggled,
-                                onProfileWidthChange = viewModel::onProfileWidthChanged,
-                                onProfileGaugeChange = viewModel::onProfileGaugeChanged
-                            )
-                        }
-                    }
-
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                            PaintCard(
-                                enabled = uiState.paintEnabled,
-                                productName = uiState.paintProductNameInput,
-                                unit = uiState.paintUnit,
-                                coverageInput = uiState.paintCoverageInput,
-                                finishCoatsInput = uiState.paintFinishCoatsInput,
-                                wastePercentInput = uiState.paintWastePercentInput,
-                                errors = uiState.paintValidationErrors,
-                                paintAreaM2 = paintAreaM2,
-                                onEnabledChange = viewModel::onPaintEnabledToggled,
-                                onProductNameChange = viewModel::onPaintProductNameChanged,
-                                onUnitChange = viewModel::onPaintUnitChanged,
-                                onCoverageChange = viewModel::onPaintCoverageChanged,
-                                onFinishCoatsChange = viewModel::onPaintFinishCoatsChanged,
-                                onWasteChange = viewModel::onPaintWasteChanged
                             )
                         }
                     }
@@ -341,36 +515,13 @@ fun CalculationFormScreen(
                     }
                 }
             }
-
-            // Botón de Acción Principal para Calcular
-            item {
-                Box(modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp)) {
-                    Button(
-                        onClick = { viewModel.calculateAndGoToResults() },
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .testTag("calculate_and_view_results_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Calcular y Ver Desglose",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// Componentes Auxiliares de Formulario
+// -----------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -408,7 +559,7 @@ fun ElementTypeSelectorCard(
                         ConstructionElementType.MURO_DRYWALL -> Icons.Default.Layers
                         ConstructionElementType.CIELO_RASO_DRYWALL -> Icons.Default.Straighten
                         ConstructionElementType.CIELO_RASO_PVC -> Icons.Default.GridView
-                        ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Layers
+                        ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Kitchen
                     }
                     FilterChip(
                         selected = selectedType == type,
@@ -418,15 +569,201 @@ fun ElementTypeSelectorCard(
                     )
                 }
             }
+        }
+    }
+}
 
-            OutlinedTextField(
-                value = elementName,
-                onValueChange = onElementNameChange,
-                label = { Text("Nombre o Ubicación del Elemento") },
-                placeholder = { Text("ej. Pared Principal / Techo Baño / Mueble TV") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+@Composable
+fun FormBannerCard(selectedType: ConstructionElementType) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "🏗️ Cómputo: ${selectedType.displayName}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Configura las medidas y especificaciones técnicas para generar el presupuesto detallado de materiales.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
+@Composable
+fun PresetsRow(
+    onApplyPreset: (Double, Double, Boolean, Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = false,
+            onClick = { onApplyPreset(3.0, 2.6, true, true) },
+            label = { Text("3.0m x 2.6m (Estándar)") }
+        )
+        FilterChip(
+            selected = false,
+            onClick = { onApplyPreset(4.0, 2.6, true, true) },
+            label = { Text("4.0m x 2.6m") }
+        )
+        FilterChip(
+            selected = false,
+            onClick = { onApplyPreset(5.0, 2.8, true, true) },
+            label = { Text("5.0m x 2.8m (Grande)") }
+        )
+        FilterChip(
+            selected = false,
+            onClick = { onApplyPreset(3.0, 2.6, false, true) },
+            label = { Text("Trasdosado 1 Cara") }
+        )
+    }
+}
+
+@Composable
+fun DimensionsCard(
+    lengthInput: String,
+    heightInput: String,
+    lengthError: String?,
+    heightError: String?,
+    onLengthChange: (String) -> Unit,
+    onHeightChange: (String) -> Unit,
+    onAdjustLength: (Double) -> Unit,
+    onAdjustHeight: (Double) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        OutlinedTextField(
+            value = lengthInput,
+            onValueChange = onLengthChange,
+            label = { Text("Largo del Muro (metros)") },
+            isError = lengthError != null,
+            supportingText = { lengthError?.let { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onAdjustLength(-0.5) }, modifier = Modifier.weight(1f)) { Text("- 0.5m") }
+            Button(onClick = { onAdjustLength(0.5) }, modifier = Modifier.weight(1f)) { Text("+ 0.5m") }
+        }
+
+        OutlinedTextField(
+            value = heightInput,
+            onValueChange = onHeightChange,
+            label = { Text("Alto del Muro (metros)") },
+            isError = heightError != null,
+            supportingText = { heightError?.let { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onAdjustHeight(-0.1) }, modifier = Modifier.weight(1f)) { Text("- 0.1m") }
+            Button(onClick = { onAdjustHeight(0.1) }, modifier = Modifier.weight(1f)) { Text("+ 0.1m") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TechnicalSpecsCard(
+    faces: WallFaces,
+    boardType: DrywallBoardType,
+    hasInsulation: Boolean,
+    profileWidth: ProfileWidth,
+    profileGauge: ProfileGauge,
+    profileLength: ProfileLength,
+    onFacesChange: (WallFaces) -> Unit,
+    onBoardTypeChange: (DrywallBoardType) -> Unit,
+    onInsulationToggle: (Boolean) -> Unit,
+    onProfileWidthChange: (ProfileWidth) -> Unit,
+    onProfileGaugeChange: (ProfileGauge) -> Unit,
+    onProfileLengthChange: (ProfileLength) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Caras a Revestir", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WallFaces.entries.forEach { f ->
+                FilterChip(
+                    selected = faces == f,
+                    onClick = { onFacesChange(f) },
+                    label = { Text(f.label) }
+                )
+            }
+        }
+
+        Text("Tipo de Placa", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DrywallBoardType.entries.forEach { board ->
+                FilterChip(
+                    selected = boardType == board,
+                    onClick = { onBoardTypeChange(board) },
+                    label = { Text(board.displayName) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        Text("Longitud Comercial del Perfil", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ProfileLength.entries.forEach { len ->
+                FilterChip(
+                    selected = profileLength == len,
+                    onClick = { onProfileLengthChange(len) },
+                    label = { Text(len.displayName) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        Text("Ancho del Perfil (Stud / Canal)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ProfileWidth.entries.forEach { width ->
+                FilterChip(
+                    selected = profileWidth == width,
+                    onClick = { onProfileWidthChange(width) },
+                    label = { Text(width.displayName) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        Text("Calibre del Acero Galvanizado", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ProfileGauge.entries.forEach { gauge ->
+                FilterChip(
+                    selected = profileGauge == gauge,
+                    onClick = { onProfileGaugeChange(gauge) },
+                    label = { Text(gauge.displayName) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Aislamiento Térmico / Acústico", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("Lana de vidrio o mineral en cavidad", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(
+                checked = hasInsulation,
+                onCheckedChange = onInsulationToggle
             )
         }
     }
@@ -441,46 +778,27 @@ fun CeilingDimensionsCard(
     onWidthChange: (String) -> Unit,
     onSuspensionChange: (String) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Dimensiones del Cielo Raso (m)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Dimensiones Cielo Raso Drywall", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = lengthInput,
                 onValueChange = onLengthChange,
-                label = { Text("Largo del Techo (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = { Text("Largo (m)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-
             OutlinedTextField(
                 value = widthInput,
                 onValueChange = onWidthChange,
-                label = { Text("Ancho del Techo (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = { Text("Ancho (m)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-
             OutlinedTextField(
                 value = suspensionInput,
                 onValueChange = onSuspensionChange,
-                label = { Text("Altura de Descolgado / Suspensión (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = { Text("Altura de Suspensión (m)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -499,61 +817,37 @@ fun PvcCeilingDimensionsCard(
     onSlatWidthChange: (String) -> Unit,
     onSlatLengthChange: (String) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Dimensiones Cielo Raso PVC (m)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Dimensiones Cielo Raso PVC", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = lengthInput,
                 onValueChange = onLengthChange,
-                label = { Text("Largo del Techo (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = { Text("Largo del Área (m)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-
             OutlinedTextField(
                 value = widthInput,
                 onValueChange = onWidthChange,
-                label = { Text("Ancho del Techo (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = { Text("Ancho del Área (m)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = slatWidthInput,
-                    onValueChange = onSlatWidthChange,
-                    label = { Text("Ancho Tablilla (m)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = slatLengthInput,
-                    onValueChange = onSlatLengthChange,
-                    label = { Text("Largo Comercial (m)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
+            OutlinedTextField(
+                value = slatWidthInput,
+                onValueChange = onSlatWidthChange,
+                label = { Text("Ancho de Tablilla PVC (m)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = slatLengthInput,
+                onValueChange = onSlatLengthChange,
+                label = { Text("Largo Comercial Tablilla (m)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
         }
     }
 }
@@ -571,513 +865,44 @@ fun FurnitureDimensionsCard(
     onShelvesChange: (String) -> Unit,
     onDividersChange: (String) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Dimensiones del Mueble / Repisa (m)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Dimensiones Mueble / Repisa Drywall", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = widthInput,
+                onValueChange = onWidthChange,
+                label = { Text("Ancho Total (m)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = widthInput,
-                    onValueChange = onWidthChange,
-                    label = { Text("Ancho (m)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = heightInput,
-                    onValueChange = onHeightChange,
-                    label = { Text("Alto (m)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-
+            OutlinedTextField(
+                value = heightInput,
+                onValueChange = onHeightChange,
+                label = { Text("Alto Total (m)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
             OutlinedTextField(
                 value = depthInput,
                 onValueChange = onDepthChange,
                 label = { Text("Profundidad (m)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = shelvesInput,
-                    onValueChange = onShelvesChange,
-                    label = { Text("N° Repisas Horiz.") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = dividersInput,
-                    onValueChange = onDividersChange,
-                    label = { Text("N° Divisores Vert.") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun FormBannerCard(selectedType: ConstructionElementType) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when (selectedType) {
-                                ConstructionElementType.MURO_DRYWALL -> Icons.Default.Layers
-                                ConstructionElementType.CIELO_RASO_DRYWALL -> Icons.Default.Straighten
-                                ConstructionElementType.CIELO_RASO_PVC -> Icons.Default.GridView
-                                ConstructionElementType.MUEBLE_DRYWALL -> Icons.Default.Layers
-                            },
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = selectedType.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = selectedType.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Text(
-                    text = "8% Desperdicio",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun PresetsRow(
-    lengthInput: String,
-    heightInput: String,
-    faces: WallFaces,
-    onApplyPreset: (Double, Double, Boolean, Boolean) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "Presets Comunes de Construcción",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            InputChip(
-                selected = lengthInput == "4.0" && heightInput == "2.6" && faces == WallFaces.BOTH_FACES,
-                onClick = { onApplyPreset(4.0, 2.6, true, true) },
-                label = { Text("Tabique 4.0 x 2.6 m") }
-            )
-            InputChip(
-                selected = lengthInput == "6.0" && heightInput == "2.8" && faces == WallFaces.BOTH_FACES,
-                onClick = { onApplyPreset(6.0, 2.8, true, true) },
-                label = { Text("Muro Alto 6.0 x 2.8 m") }
-            )
-            InputChip(
-                selected = lengthInput == "5.0" && heightInput == "2.5" && faces == WallFaces.ONE_FACE,
-                onClick = { onApplyPreset(5.0, 2.5, false, false) },
-                label = { Text("Revestimiento 5.0 x 2.5 m (1 Cara)") }
-            )
-        }
-    }
-}
-
-@Composable
-fun DimensionsCard(
-    lengthInput: String,
-    heightInput: String,
-    lengthError: String?,
-    heightError: String?,
-    onLengthChange: (String) -> Unit,
-    onHeightChange: (String) -> Unit,
-    onAdjustLength: (Double) -> Unit,
-    onAdjustHeight: (Double) -> Unit
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Dimensiones del Muro (Metros)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Largo del muro (m)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IconButton(
-                        onClick = { onAdjustLength(-0.5) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Remove, contentDescription = "Restar 0.5m")
-                    }
-
-                    OutlinedTextField(
-                        value = lengthInput,
-                        onValueChange = onLengthChange,
-                        placeholder = { Text("ej. 4.0") },
-                        isError = lengthError != null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("form_length_field"),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    IconButton(
-                        onClick = { onAdjustLength(0.5) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Sumar 0.5m")
-                    }
-                }
-
-                if (lengthError != null) {
-                    Text(
-                        text = lengthError,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 52.dp)
-                    )
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Alto del muro (m)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IconButton(
-                        onClick = { onAdjustHeight(-0.5) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Remove, contentDescription = "Restar 0.5m")
-                    }
-
-                    OutlinedTextField(
-                        value = heightInput,
-                        onValueChange = onHeightChange,
-                        placeholder = { Text("ej. 2.6") },
-                        isError = heightError != null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("form_height_field"),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    IconButton(
-                        onClick = { onAdjustHeight(0.5) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Sumar 0.5m")
-                    }
-                }
-
-                if (heightError != null) {
-                    Text(
-                        text = heightError,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 52.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TechnicalSpecsCard(
-    faces: WallFaces,
-    studSpacingMeters: Double,
-    boardType: DrywallBoardType,
-    hasInsulation: Boolean,
-    profileWidth: ProfileWidth,
-    profileGauge: ProfileGauge,
-    onFacesChange: (WallFaces) -> Unit,
-    onStudSpacingChange: (Double) -> Unit,
-    onBoardTypeChange: (DrywallBoardType) -> Unit,
-    onInsulationToggle: (Boolean) -> Unit,
-    onProfileWidthChange: (ProfileWidth) -> Unit,
-    onProfileGaugeChange: (ProfileGauge) -> Unit
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Especificaciones Técnicas",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = "Caras emplacadas",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = faces == WallFaces.ONE_FACE,
-                    onClick = { onFacesChange(WallFaces.ONE_FACE) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) {
-                    Text("1 Cara")
-                }
-                SegmentedButton(
-                    selected = faces == WallFaces.BOTH_FACES,
-                    onClick = { onFacesChange(WallFaces.BOTH_FACES) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text("2 Caras")
-                }
-            }
-
-            HorizontalDivider()
-
-            Row(
+            OutlinedTextField(
+                value = shelvesInput,
+                onValueChange = onShelvesChange,
+                label = { Text("Cantidad de Repisas Horizontales") },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Separación entre postes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = if (studSpacingMeters < 0.5) "40.7 cm (16\") - Muros altos o mayor rigidez" else "61.0 cm (24\") - Muros estándar ligeros",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(
-                        selected = studSpacingMeters < 0.5,
-                        onClick = { onStudSpacingChange(0.407) },
-                        label = { Text("40.7 cm") }
-                    )
-                    FilterChip(
-                        selected = studSpacingMeters >= 0.5,
-                        onClick = { onStudSpacingChange(0.61) },
-                        label = { Text("61 cm") }
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            Text(
-                text = "Ancho de Perfil (Norma NSR-10)",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                shape = RoundedCornerShape(12.dp)
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ProfileWidth.entries.forEach { width ->
-                    FilterChip(
-                        selected = profileWidth == width,
-                        onClick = { onProfileWidthChange(width) },
-                        label = { Text(width.displayName) }
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            Text(
-                text = "Calibre de Acero Galvanizado",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            OutlinedTextField(
+                value = dividersInput,
+                onValueChange = onDividersChange,
+                label = { Text("Cantidad de Divisiones Verticales") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ProfileGauge.entries.forEach { gauge ->
-                    FilterChip(
-                        selected = profileGauge == gauge,
-                        onClick = { onProfileGaugeChange(gauge) },
-                        label = { Text(gauge.displayName) }
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            Text(
-                text = "Tipo de Placa",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DrywallBoardType.entries.forEach { type ->
-                    FilterChip(
-                        selected = boardType == type,
-                        onClick = { onBoardTypeChange(type) },
-                        label = { Text(type.displayName) }
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Aislamiento Termoacústico",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "Lana de vidrio o mineral en rollos",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Switch(
-                    checked = hasInsulation,
-                    onCheckedChange = onInsulationToggle,
-                    modifier = Modifier.testTag("form_insulation_switch")
-                )
-            }
         }
     }
 }

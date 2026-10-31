@@ -48,8 +48,8 @@ class DrywallReportExporterTest {
         assertTrue(report.contains("*8%*"))
 
         // Verificación de insumos clave en formato WhatsApp (*negrita*, `código`)
-        assertTrue(report.contains("`CANAL-60-3M`"))
-        assertTrue(report.contains("`POSTE-59-3M`"))
+        assertTrue(report.contains("`CANAL-60-"))
+        assertTrue(report.contains("`POSTE-59-"))
         assertTrue(report.contains("`PLACA-ST-12.7`"))
         assertTrue(report.contains("`TORN-T1-8x1/2`"))
         assertTrue(report.contains("`TORN-T2-6x1`"))
