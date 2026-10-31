@@ -368,9 +368,10 @@ fun ResultsSummaryBanner(
                     value = "${result.totalBoardsRequired} unid",
                     subtext = result.input.boardType.displayName.substringBefore(" (")
                 )
+                val profileLenText = String.format(java.util.Locale.getDefault(), "%.2fm", result.input.commercialProfileLengthMeters)
                 SummaryMetricItem(
-                    label = "Perfiles 3m",
-                    value = "${result.totalProfiles3mRequired} piezas",
+                    label = "Perfiles ($profileLenText)",
+                    value = "${result.totalProfilesRequired} piezas",
                     subtext = "Canales + Postes"
                 )
             }

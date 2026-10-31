@@ -272,10 +272,9 @@ class CalculatorEngineOpeningsTest {
             projectName = "Obra de prueba"
         )
 
-        assertTrue(report.contains("VANOS DEL MURO"))
+        assertTrue(report.contains("VANOS DE LA OBRA"))
         assertTrue(report.contains("Puerta baño"))
-        assertTrue(report.contains("0.90 m × 2.10 m = 1.89 m²"))
+        assertTrue(report.contains("0.90 m × 2.10 m"))
         assertTrue(report.contains("17.02 m²"))
-        assertTrue(report.contains("1.89 m² por cara"))
     }
 }

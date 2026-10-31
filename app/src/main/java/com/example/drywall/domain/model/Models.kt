@@ -278,10 +278,13 @@ data class WallCalculationResult(
     val totalBoardsRequired: Int
         get() = requirements.firstOrNull { it.material.category == MaterialCategory.PLACAS }?.commercialQuantity ?: 0
 
-    val totalProfiles3mRequired: Int
+    val totalProfilesRequired: Int
         get() = requirements
-            .filter { it.material.category == MaterialCategory.ESTRUCTURA && it.unit == UnitOfMeasure.PIEZAS_3M }
+            .filter { it.material.category == MaterialCategory.ESTRUCTURA && (it.unit == UnitOfMeasure.PIEZAS_2_44M || it.unit == UnitOfMeasure.PIEZAS_3M) }
             .sumOf { it.commercialQuantity }
+
+    val totalProfiles3mRequired: Int
+        get() = totalProfilesRequired
 
     /** Área neta emplazable de una cara (bruta menos vanos). */
     val netAreaOneFace: Double
