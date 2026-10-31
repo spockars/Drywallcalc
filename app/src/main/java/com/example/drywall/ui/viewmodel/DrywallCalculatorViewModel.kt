@@ -106,6 +106,8 @@ data class DrywallCalculatorUiState(
     val profileWidth: ProfileWidth = ProfileWidth.MM_60,
     val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
     val profileLength: ProfileLength = ProfileLength.METERS_2_44,
+    val boardTypeFaceA: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
+    val boardTypeFaceB: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
     // Pintura (calculador separado del motor de drywall)
     val paintEnabled: Boolean = false,
     val paintProductNameInput: String = "",
@@ -896,6 +898,16 @@ class DrywallCalculatorViewModel(
         calculateMaterials()
     }
 
+    fun onBoardTypeFaceAChanged(type: DrywallBoardType) {
+        _uiState.update { it.copy(boardTypeFaceA = type, boardType = type) }
+        calculateMaterials()
+    }
+
+    fun onBoardTypeFaceBChanged(type: DrywallBoardType) {
+        _uiState.update { it.copy(boardTypeFaceB = type) }
+        calculateMaterials()
+    }
+
     fun onProfileLengthChanged(length: ProfileLength) {
         _uiState.update { it.copy(profileLength = length) }
         calculateMaterials()
@@ -1149,6 +1161,8 @@ class DrywallCalculatorViewModel(
                         hasInsulation = current.hasInsulation,
                         studSpacingMeters = current.studSpacingMeters,
                         boardType = current.boardType,
+                        boardTypeFaceA = current.boardTypeFaceA,
+                        boardTypeFaceB = current.boardTypeFaceB,
                         wasteFactor = wasteFactor,
                         profileWidth = current.profileWidth,
                         profileGauge = current.profileGauge,

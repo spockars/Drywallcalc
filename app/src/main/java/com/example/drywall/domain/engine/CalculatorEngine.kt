@@ -195,7 +195,44 @@ object DrywallCatalog {
             commercialSpec = "Placa con fibra de vidrio 1.22 m x 2.44 m (2.98 m²), espesor 15.9 mm, color rosa",
             technicalFunction = "Protección pasiva contra incendios en muros cortafuego y rutas de evacuación"
         )
+        DrywallBoardType.FIBROCEMENTO_6MM -> DrywallMaterial(
+            id = "placa_fc_6",
+            code = "PLACA-FC-6MM",
+            name = "Placa de Fibrocemento Superboard (6 mm)",
+            category = MaterialCategory.PLACAS,
+            defaultUnit = UnitOfMeasure.PLACAS_ESTANDAR,
+            commercialSpec = "Placa cementicia 1.22 m x 2.44 m, espesor 6 mm",
+            technicalFunction = "Revestimiento exterior resistente a la intemperie"
+        )
+        DrywallBoardType.FIBROCEMENTO_8MM -> DrywallMaterial(
+            id = "placa_fc_8",
+            code = "PLACA-FC-8MM",
+            name = "Placa de Fibrocemento Superboard (8 mm)",
+            category = MaterialCategory.PLACAS,
+            defaultUnit = UnitOfMeasure.PLACAS_ESTANDAR,
+            commercialSpec = "Placa cementicia 1.22 m x 2.44 m, espesor 8 mm",
+            technicalFunction = "Revestimiento para fachadas exteriores y muros semipesados"
+        )
+        DrywallBoardType.FIBROCEMENTO_10MM -> DrywallMaterial(
+            id = "placa_fc_10",
+            code = "PLACA-FC-10MM",
+            name = "Placa de Fibrocemento Superboard (10 mm)",
+            category = MaterialCategory.PLACAS,
+            defaultUnit = UnitOfMeasure.PLACAS_ESTANDAR,
+            commercialSpec = "Placa cementicia 1.22 m x 2.44 m, espesor 10 mm",
+            technicalFunction = "Alta resistencia estructural para fachadas expuestas y intemperie"
+        )
     }
+
+    val TORNILLO_FIBROCEMENTO = DrywallMaterial(
+        id = "tornillo_fibrocemento",
+        code = "TORN-FC-AUTOPERFORANTE",
+        name = "Tornillo para Fibrocemento con Aletas (8 x 1-5/8\")",
+        category = MaterialCategory.FIJACIONES,
+        defaultUnit = UnitOfMeasure.UNIDADES,
+        commercialSpec = "Tornillo autoperforante con aletas escariadoras y cabeza avellanada",
+        technicalFunction = "Fija placas de fibrocemento a perfiles de acero avellanando la superficie"
+    )
 
     // Fijaciones y tornillería
     val TORNILLO_T1 = DrywallMaterial(
@@ -411,31 +448,37 @@ class CalculatorEngine {
         }
 
         // =========================================================================
-        // 4. PLACAS DE YESO (Drywall Boards 1.22 x 2.44 m)
+        // 4. PLACAS DE YESO Y FIBROCEMENTO (1.22 x 2.44 m)
         // =========================================================================
-        val boardMaterial = DrywallCatalog.getBoardMaterial(input.boardType)
-        val boardsRawCount = netDrywallArea / BOARD_SURFACE_AREA_M2
-        val boardsCountWithWaste = boardsRawCount * wasteMultiplier
-        val commercialBoardsCount = ceil(boardsCountWithWaste).toInt().coerceAtLeast(1)
+        val areaFaceA = input.netAreaOneFace
+        val areaFaceB = if (input.faces == WallFaces.BOTH_FACES) input.netAreaOneFace else 0.0
 
-        requirements.add(
-            MaterialRequirement(
-                material = boardMaterial,
-                rawQuantity = boardsRawCount,
-                wastePercentage = input.wasteFactor,
-                quantityWithWaste = boardsCountWithWaste,
-                commercialQuantity = commercialBoardsCount,
-                unit = UnitOfMeasure.PLACAS_ESTANDAR,
-                formulaExplanation = buildString {
-                    append("Área neta a emplacar: ${netDrywallArea.format(2)} m² (${input.faces.label}")
-                    if (input.openings.isNotEmpty()) {
-                        append("; ${input.openings.size} vano/s descuentan ${input.openingsAreaOneFace.format(2)} m² por cara")
-                    }
-                    append("). Área por placa: ${BOARD_SURFACE_AREA_M2.format(2)} m².")
-                    append(" Base: ${boardsRawCount.format(2)} + ${input.wastePercentageString()} desperdicio = $commercialBoardsCount placas.")
-                }
-            )
-        )
+        val boardA = input.boardTypeFaceA
+        val boardB = if (input.faces == WallFaces.BOTH_FACES) input.boardTypeFaceB else input.boardTypeFaceA
+
+        val netAreasByType = mutableMapOf<DrywallBoardType, Double>()
+        netAreasByType[boardA] = (netAreasByType[boardA] ?: 0.0) + areaFaceA
+        netAreasByType[boardB] = (netAreasByType[boardB] ?: 0.0) + areaFaceB
+
+        netAreasByType.forEach { (boardType, area) ->
+            if (area > 0) {
+                val boardMaterial = DrywallCatalog.getBoardMaterial(boardType)
+                val rawCount = area / BOARD_SURFACE_AREA_M2
+                val withWaste = rawCount * wasteMultiplier
+                val commercialCount = ceil(withWaste).toInt().coerceAtLeast(1)
+                requirements.add(
+                    MaterialRequirement(
+                        material = boardMaterial,
+                        rawQuantity = rawCount,
+                        wastePercentage = input.wasteFactor,
+                        quantityWithWaste = withWaste,
+                        commercialQuantity = commercialCount,
+                        unit = UnitOfMeasure.PLACAS_ESTANDAR,
+                        formulaExplanation = "Área neta (${boardType.displayName}): ${area.format(2)} m² / ${BOARD_SURFACE_AREA_M2.format(2)} m² = ${rawCount.format(2)} + ${input.wastePercentageString()} desperdicio = $commercialCount placas."
+                    )
+                )
+            }
+        }
 
         // =========================================================================
         // 5. TORNILLOS T1 (Metal-Metal para fijar postes a canales)
@@ -458,24 +501,63 @@ class CalculatorEngine {
         )
 
         // =========================================================================
-        // 6. TORNILLOS T2 (Placa a Metal)
+        // 6. TORNILLOS T2 Y TORNILLOS PARA FIBROCEMENTO
         // =========================================================================
-        // Norma constructiva: tornillos cada 25-30 cm = promedio técnico 30 tornillos por placa
-        val t2RawCount = commercialBoardsCount * SCREWS_T2_PER_BOARD.toDouble()
-        val t2WithWaste = t2RawCount * wasteMultiplier
-        val commercialT2Count = ceil(t2WithWaste).toInt()
+        val hasFiberCement = boardA.isFiberCement || boardB.isFiberCement
+        val totalBoardsForScrews = requirements.filter { it.material.category == MaterialCategory.PLACAS }.sumOf { it.commercialQuantity }
 
-        requirements.add(
-            MaterialRequirement(
-                material = DrywallCatalog.TORNILLO_T2,
-                rawQuantity = t2RawCount,
-                wastePercentage = input.wasteFactor,
-                quantityWithWaste = t2WithWaste,
-                commercialQuantity = commercialT2Count,
-                unit = UnitOfMeasure.UNIDADES,
-                formulaExplanation = "$commercialBoardsCount placas x $SCREWS_T2_PER_BOARD tornillos/placa = ${t2RawCount.toInt()} tornillos + ${input.wastePercentageString()} desperdicio = $commercialT2Count unidades."
+        if (hasFiberCement) {
+            val fcBoards = requirements.filter { it.material.id.startsWith("placa_fc") }.sumOf { it.commercialQuantity }
+            val stBoards = totalBoardsForScrews - fcBoards
+
+            if (stBoards > 0) {
+                val t2Raw = stBoards * 30.0
+                val t2WithW = t2Raw * wasteMultiplier
+                val t2Comm = ceil(t2WithW).toInt().coerceAtLeast(1)
+                requirements.add(
+                    MaterialRequirement(
+                        material = DrywallCatalog.TORNILLO_T2,
+                        rawQuantity = t2Raw,
+                        wastePercentage = input.wasteFactor,
+                        quantityWithWaste = t2WithW,
+                        commercialQuantity = t2Comm,
+                        unit = UnitOfMeasure.UNIDADES,
+                        formulaExplanation = "$stBoards placas de yeso x 30 tornillos/placa = ${t2Raw.toInt()} tornillos + ${input.wastePercentageString()} desperdicio = $t2Comm unidades."
+                    )
+                )
+            }
+            if (fcBoards > 0) {
+                val fcRaw = fcBoards * 35.0
+                val fcWithW = fcRaw * wasteMultiplier
+                val fcComm = ceil(fcWithW).toInt().coerceAtLeast(1)
+                requirements.add(
+                    MaterialRequirement(
+                        material = DrywallCatalog.TORNILLO_FIBROCEMENTO,
+                        rawQuantity = fcRaw,
+                        wastePercentage = input.wasteFactor,
+                        quantityWithWaste = fcWithW,
+                        commercialQuantity = fcComm,
+                        unit = UnitOfMeasure.UNIDADES,
+                        formulaExplanation = "$fcBoards placas de fibrocemento x 35 tornillos con aletas/placa = ${fcRaw.toInt()} tornillos + ${input.wastePercentageString()} desperdicio = $fcComm unidades."
+                    )
+                )
+            }
+        } else {
+            val t2Raw = totalBoardsForScrews * 30.0
+            val t2WithW = t2Raw * wasteMultiplier
+            val t2Comm = ceil(t2WithW).toInt().coerceAtLeast(1)
+            requirements.add(
+                MaterialRequirement(
+                    material = DrywallCatalog.TORNILLO_T2,
+                    rawQuantity = t2Raw,
+                    wastePercentage = input.wasteFactor,
+                    quantityWithWaste = t2WithW,
+                    commercialQuantity = t2Comm,
+                    unit = UnitOfMeasure.UNIDADES,
+                    formulaExplanation = "$totalBoardsForScrews placas x 30 tornillos/placa = ${t2Raw.toInt()} tornillos + ${input.wastePercentageString()} desperdicio = $t2Comm unidades."
+                )
             )
-        )
+        }
 
         // =========================================================================
         // 7. ANCLAJES (Chazos con tornillo para canales de piso y techo)

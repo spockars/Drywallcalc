@@ -384,13 +384,15 @@ fun CalculationFormScreen(
                                         Spacer(modifier = Modifier.height(16.dp))
                                         TechnicalSpecsCard(
                                             faces = uiState.faces,
-                                            boardType = uiState.boardType,
+                                            boardTypeFaceA = uiState.boardTypeFaceA,
+                                            boardTypeFaceB = uiState.boardTypeFaceB,
                                             hasInsulation = uiState.hasInsulation,
                                             profileWidth = uiState.profileWidth,
                                             profileGauge = uiState.profileGauge,
                                             profileLength = uiState.profileLength,
                                             onFacesChange = viewModel::onFacesChanged,
-                                            onBoardTypeChange = viewModel::onBoardTypeChanged,
+                                            onBoardTypeFaceAChange = viewModel::onBoardTypeFaceAChanged,
+                                            onBoardTypeFaceBChange = viewModel::onBoardTypeFaceBChanged,
                                             onInsulationToggle = viewModel::onInsulationToggled,
                                             onProfileWidthChange = viewModel::onProfileWidthChanged,
                                             onProfileGaugeChange = viewModel::onProfileGaugeChanged,
@@ -680,13 +682,15 @@ fun DimensionsCard(
 @Composable
 fun TechnicalSpecsCard(
     faces: WallFaces,
-    boardType: DrywallBoardType,
+    boardTypeFaceA: DrywallBoardType,
+    boardTypeFaceB: DrywallBoardType,
     hasInsulation: Boolean,
     profileWidth: ProfileWidth,
     profileGauge: ProfileGauge,
     profileLength: ProfileLength,
     onFacesChange: (WallFaces) -> Unit,
-    onBoardTypeChange: (DrywallBoardType) -> Unit,
+    onBoardTypeFaceAChange: (DrywallBoardType) -> Unit,
+    onBoardTypeFaceBChange: (DrywallBoardType) -> Unit,
     onInsulationToggle: (Boolean) -> Unit,
     onProfileWidthChange: (ProfileWidth) -> Unit,
     onProfileGaugeChange: (ProfileGauge) -> Unit,
@@ -704,15 +708,29 @@ fun TechnicalSpecsCard(
             }
         }
 
-        Text("Tipo de Placa", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Text(if (faces == WallFaces.BOTH_FACES) "Tipo de Placa — Cara A (Interior)" else "Tipo de Placa", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DrywallBoardType.entries.forEach { board ->
                 FilterChip(
-                    selected = boardType == board,
-                    onClick = { onBoardTypeChange(board) },
+                    selected = boardTypeFaceA == board,
+                    onClick = { onBoardTypeFaceAChange(board) },
                     label = { Text(board.displayName) },
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        }
+
+        if (faces == WallFaces.BOTH_FACES) {
+            Text("Tipo de Placa — Cara B (Exterior / 2da Cara)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                DrywallBoardType.entries.forEach { board ->
+                    FilterChip(
+                        selected = boardTypeFaceB == board,
+                        onClick = { onBoardTypeFaceBChange(board) },
+                        label = { Text(board.displayName) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 

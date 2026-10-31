@@ -51,11 +51,15 @@ enum class DrywallBoardType(
     val code: String,
     val displayName: String,
     val description: String,
-    val thicknessMm: Double
+    val thicknessMm: Double,
+    val isFiberCement: Boolean = false
 ) {
-    ESTANDAR_ST("ST", "Estándar (ST 1/2\")", "Para muros interiores y cielos rasos estándar", 12.7),
-    RESISTENTE_HUMEDAD_RH("RH", "Resistente a Humedad (RH 1/2\")", "Ideal para baños, cocinas y zonas húmedas", 12.7),
-    RESISTENTE_FUEGO_RF("RF", "Resistente al Fuego (RF 5/8\")", "Mayor resistencia al fuego para salidas de emergencia y cocinas", 15.9)
+    ESTANDAR_ST("ST", "Estándar (ST 1/2\")", "Para muros interiores y cielos rasos estándar", 12.7, false),
+    RESISTENTE_HUMEDAD_RH("RH", "Resistente a Humedad (RH 1/2\")", "Ideal para baños, cocinas y zonas húmedas", 12.7, false),
+    RESISTENTE_FUEGO_RF("RF", "Resistente al Fuego (RF 5/8\")", "Mayor resistencia al fuego para salidas de emergencia y cocinas", 15.9, false),
+    FIBROCEMENTO_6MM("FC-6", "Fibrocemento Superboard 6 mm", "Ideal para revestimientos exteriores y faldones", 6.0, true),
+    FIBROCEMENTO_8MM("FC-8", "Fibrocemento Superboard 8 mm", "Para fachadas exteriores y muros semipesados", 8.0, true),
+    FIBROCEMENTO_10MM("FC-10", "Fibrocemento Superboard 10 mm", "Alta resistencia para fachadas y intemperie", 10.0, true)
 }
 
 /**
@@ -150,7 +154,8 @@ enum class ProfileWidth(val code: String, val displayName: String, val sizeMm: I
 enum class ProfileGauge(val code: String, val displayName: String, val description: String) {
     CALIBRE_26("CAL_26", "Calibre 26 (Económico / Residencial)", "Espesor nominal ~0.45 mm"),
     CALIBRE_24("CAL_24", "Calibre 24 (Comercial Estándar)", "Espesor nominal ~0.55 mm"),
-    CALIBRE_22("CAL_22", "Calibre 22 (Estructural / Comercial Pesado)", "Espesor nominal ~0.75 mm")
+    CALIBRE_22("CAL_22", "Calibre 22 (Estructural / Comercial Pesado)", "Espesor nominal ~0.75 mm"),
+    CALIBRE_20("CAL_20", "Calibre 20 (Estructural Pesado / Fachadas)", "Espesor nominal ~0.95 mm")
 }
 
 /**
@@ -171,6 +176,8 @@ data class WallCalculationInput(
     val hasInsulation: Boolean = false,
     val studSpacingMeters: Double = 0.407,
     val boardType: DrywallBoardType = DrywallBoardType.ESTANDAR_ST,
+    val boardTypeFaceA: DrywallBoardType = boardType,
+    val boardTypeFaceB: DrywallBoardType = boardType,
     val wasteFactor: Double = 0.08,
     val profileWidth: ProfileWidth = ProfileWidth.MM_60,
     val profileGauge: ProfileGauge = ProfileGauge.CALIBRE_26,
