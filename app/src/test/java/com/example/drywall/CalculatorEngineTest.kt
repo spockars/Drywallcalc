@@ -147,5 +147,24 @@ class CalculatorEngineTest {
         assertEquals(4.5, commaState.calculationResult?.input?.lengthMeters ?: 0.0, 0.001)
         assertEquals(2.8, commaState.calculationResult?.input?.heightMeters ?: 0.0, 0.001)
     }
+
+    @Test
+    fun testConsolidatedProjectCalculation_eliminatesCumulativeRoundingExcess() {
+        val input = WallCalculationInput(
+            lengthMeters = 8.0,
+            heightMeters = 2.5,
+            faces = WallFaces.BOTH_FACES,
+            wasteFactor = 0.08
+        )
+        val singleWallResult = engine.calculate(input)
+        assertEquals(15, singleWallResult.totalBoardsRequired)
+
+        val tenWallResults = List(10) { singleWallResult }
+        val consolidatedReqs = engine.calculateConsolidatedProject(tenWallResults)
+        val consolidatedBoardReq = consolidatedReqs.first { it.material.category == MaterialCategory.PLACAS }
+
+        assertEquals(146, consolidatedBoardReq.commercialQuantity)
+        assertTrue(consolidatedBoardReq.commercialQuantity < (singleWallResult.totalBoardsRequired * 10))
+    }
 }
 

@@ -1,7 +1,9 @@
 package com.example.drywall.data.repository
 
+import com.example.drywall.data.local.DrywallDatabase
+import com.example.drywall.data.local.dao.CalculationDao
+import com.example.drywall.data.local.dao.PriceDao
 import com.example.drywall.data.local.dao.ProjectDao
-import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
 import com.example.drywall.data.local.entity.WallCalculationEntity
@@ -55,14 +57,19 @@ interface DrywallRepository {
 }
 
 /**
- * Implementación concreta del repositorio utilizando [ProjectDao].
- *
- * Cada muro se guarda con sus vanos y su resultado de pintura, y el proyecto se marca como
- * modificado para que la lista de obras refleje el último cambio.
+ * Implementación concreta del repositorio utilizando [ProjectDao], [CalculationDao] y [PriceDao].
  */
 class DrywallRepositoryImpl(
-    private val projectDao: ProjectDao
+    private val projectDao: ProjectDao,
+    private val calculationDao: CalculationDao,
+    private val priceDao: PriceDao
 ) : DrywallRepository {
+
+    constructor(database: DrywallDatabase) : this(
+        projectDao = database.projectDao(),
+        calculationDao = database.calculationDao(),
+        priceDao = database.priceDao()
+    )
 
     override val allProjectsWithCalculations: Flow<List<ProjectWithCalculations>> =
         projectDao.getAllProjectsWithCalculations()
@@ -129,7 +136,7 @@ class DrywallRepositoryImpl(
 
     override suspend fun addCalculationEntityToProject(entity: WallCalculationEntity): Long {
         val now = System.currentTimeMillis()
-        val id = projectDao.insertCalculation(entity.copy(createdAt = now))
+        val id = calculationDao.insertCalculation(entity.copy(createdAt = now))
         projectDao.touchProject(entity.projectId, now)
         return id
     }
@@ -143,16 +150,16 @@ class DrywallRepositoryImpl(
     }
 
     override suspend fun deleteCalculation(calculationId: Long) {
-        projectDao.deleteCalculationById(calculationId)
+        calculationDao.deleteCalculationById(calculationId)
     }
 
     override val materialPrices: Flow<List<PriceEntry>> =
-        projectDao.observeMaterialPrices().map { rows -> rows.map { it.toDomain() } }
+        priceDao.observeMaterialPrices().map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun saveMaterialPrices(prices: List<PriceEntry>) {
         if (prices.isEmpty()) return
         val now = System.currentTimeMillis()
-        projectDao.upsertMaterialPrices(
+        priceDao.upsertMaterialPrices(
             prices.map { it.copy(updatedAt = now).toEntity() }
         )
     }
@@ -173,17 +180,13 @@ class DrywallRepositoryImpl(
         calculationResult: WallCalculationResult,
         timestamp: Long
     ): Long {
-        val wallId = projectDao.insertCalculation(
-            calculationResult.toEntity(
-                projectId = projectId,
-                wallName = wallName,
-                createdAt = timestamp
-            )
+        val wallEntity = calculationResult.toEntity(
+            projectId = projectId,
+            wallName = wallName,
+            createdAt = timestamp
         )
-        val openings = calculationResult.toOpeningEntities(wallId = wallId, projectId = projectId)
-        if (openings.isNotEmpty()) {
-            projectDao.insertOpenings(openings)
-        }
-        return wallId
+        val dummyWallId = 0L
+        val openings = calculationResult.toOpeningEntities(wallId = dummyWallId, projectId = projectId)
+        return calculationDao.insertWallWithOpenings(wallEntity, openings)
     }
 }

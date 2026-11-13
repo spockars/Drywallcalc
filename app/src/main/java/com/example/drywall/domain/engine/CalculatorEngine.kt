@@ -1136,6 +1136,57 @@ class CalculatorEngine {
         return requirements
     }
 
+    /**
+     * Consolida los requerimientos de materiales de múltiples muros/elementos de un proyecto completo,
+     * acumulando las cantidades exactas teóricas con desperdicio y aplicando el redondeo comercial (`ceil`)
+     * a nivel global de obra en lugar de muro por muro. Esto elimina el exceso acumulativo de material.
+     */
+    fun calculateConsolidatedProject(wallResults: List<WallCalculationResult>): List<MaterialRequirement> {
+        if (wallResults.isEmpty()) return emptyList()
+
+        val consolidatedMap = mutableMapOf<String, ConsolidatedItem>()
+
+        wallResults.forEach { result ->
+            result.requirements.forEach { req ->
+                val key = req.material.id
+                val existing = consolidatedMap[key]
+                if (existing == null) {
+                    consolidatedMap[key] = ConsolidatedItem(
+                        material = req.material,
+                        unit = req.unit,
+                        rawQuantitySum = req.rawQuantity,
+                        quantityWithWasteSum = req.quantityWithWaste,
+                        wastePercentage = req.wastePercentage
+                    )
+                } else {
+                    existing.rawQuantitySum += req.rawQuantity
+                    existing.quantityWithWasteSum += req.quantityWithWaste
+                }
+            }
+        }
+
+        return consolidatedMap.values.map { item ->
+            val finalCommercial = ceil(item.quantityWithWasteSum).toInt().coerceAtLeast(1)
+            MaterialRequirement(
+                material = item.material,
+                rawQuantity = item.rawQuantitySum,
+                wastePercentage = item.wastePercentage,
+                quantityWithWaste = item.quantityWithWasteSum,
+                commercialQuantity = finalCommercial,
+                unit = item.unit,
+                formulaExplanation = "Consolidado global de obra (${wallResults.size} elemento/s): ${item.quantityWithWasteSum.format(2)} teóricas con desperdicio -> Redondeo global = $finalCommercial ${if (finalCommercial == 1) item.unit.singularName else item.unit.pluralName}."
+            )
+        }
+    }
+
+    private data class ConsolidatedItem(
+        val material: DrywallMaterial,
+        val unit: UnitOfMeasure,
+        var rawQuantitySum: Double,
+        var quantityWithWasteSum: Double,
+        val wastePercentage: Double
+    )
+
     private fun WallCalculationInput.wastePercentageString(): String =
         "${(wasteFactor * 100).roundToInt()}%"
 

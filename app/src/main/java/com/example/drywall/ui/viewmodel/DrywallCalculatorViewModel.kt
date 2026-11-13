@@ -1228,7 +1228,7 @@ class DrywallCalculatorViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         val database = DrywallDatabase.getInstance(application)
-        val repository = DrywallRepositoryImpl(database.projectDao())
+        val repository = DrywallRepositoryImpl(database)
         @Suppress("UNCHECKED_CAST")
         return DrywallCalculatorViewModel(
             engine = CalculatorEngine(),

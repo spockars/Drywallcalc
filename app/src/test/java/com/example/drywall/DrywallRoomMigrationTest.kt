@@ -130,7 +130,7 @@ class DrywallRoomMigrationTest {
 
             // La tabla de vanos existe, acepta insertos y la relación los devuelve
             assertTrue(project.openings.isEmpty())
-            database.projectDao().insertOpenings(
+            database.calculationDao().insertOpenings(
                 listOf(
                     WallOpeningEntity(
                         wallId = wall.id,

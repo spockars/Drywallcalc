@@ -41,7 +41,7 @@ class DrywallRoomPersistenceTest {
             .allowMainThreadQueries()
             .build()
         projectDao = database.projectDao()
-        repository = DrywallRepositoryImpl(projectDao)
+        repository = DrywallRepositoryImpl(database)
     }
 
     @After
@@ -113,7 +113,7 @@ class DrywallRoomPersistenceTest {
         assertEquals(0, updatedProjects.size)
 
         // Verificar que los cómputos hijos se eliminaron en cascada
-        val remainingCalculations = projectDao.getCalculationsByProjectId(projectId).first()
+        val remainingCalculations = database.calculationDao().getCalculationsByProjectId(projectId).first()
         assertTrue(remainingCalculations.isEmpty())
     }
 }

@@ -159,8 +159,8 @@ class DrywallRoomMigration2To3Test {
             assertFalse(obraDos.project.laborEnabled)
 
             // El catálogo de precios existe, arranca vacío y ya se puede guardar
-            assertTrue(database.projectDao().getMaterialPrices().isEmpty())
-            database.projectDao().upsertMaterialPrices(
+            assertTrue(database.priceDao().getMaterialPrices().isEmpty())
+            database.priceDao().upsertMaterialPrices(
                 listOf(
                     MaterialPriceEntity(
                         itemKey = "placa_st_12_7",
@@ -170,7 +170,7 @@ class DrywallRoomMigration2To3Test {
                     )
                 )
             )
-            val prices = database.projectDao().getMaterialPrices()
+            val prices = database.priceDao().getMaterialPrices()
             assertEquals(1, prices.size)
             assertEquals(62_000.0, prices.first().toDomain().unitPrice, 0.01)
             assertEquals("placa (1.22 x 2.44 m)", prices.first().unitLabel)

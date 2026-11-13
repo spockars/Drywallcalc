@@ -8,13 +8,10 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.drywall.data.local.entity.ProjectEntity
 import com.example.drywall.data.local.entity.ProjectWithCalculations
-import com.example.drywall.data.local.entity.MaterialPriceEntity
-import com.example.drywall.data.local.entity.WallCalculationEntity
-import com.example.drywall.data.local.entity.WallOpeningEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Data Access Object (DAO) para operaciones de persistencia de proyectos y cálculos métricos.
+ * Data Access Object (DAO) exclusivo para operaciones de persistencia de Proyectos.
  */
 @Dao
 interface ProjectDao {
@@ -36,21 +33,6 @@ interface ProjectDao {
     @Query("DELETE FROM projects WHERE id = :projectId")
     suspend fun deleteProjectById(projectId: Long)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCalculation(calculation: WallCalculationEntity): Long
-
-    @Insert
-    suspend fun insertOpenings(openings: List<WallOpeningEntity>): List<Long>
-
-    @Query("SELECT * FROM wall_openings WHERE wallId = :wallId ORDER BY id ASC")
-    suspend fun getOpeningsForWall(wallId: Long): List<WallOpeningEntity>
-
-    @Query("DELETE FROM wall_openings WHERE wallId = :wallId")
-    suspend fun deleteOpeningsByWallId(wallId: Long)
-
-    @Query("DELETE FROM wall_calculations WHERE id = :calculationId")
-    suspend fun deleteCalculationById(calculationId: Long)
-
     @Query("UPDATE projects SET updatedAt = :updatedAt WHERE id = :projectId")
     suspend fun touchProject(projectId: Long, updatedAt: Long)
 
@@ -65,18 +47,6 @@ interface ProjectDao {
         amount: Double,
         updatedAt: Long
     )
-
-    @Query("SELECT * FROM material_prices")
-    fun observeMaterialPrices(): Flow<List<MaterialPriceEntity>>
-
-    @Query("SELECT * FROM material_prices")
-    suspend fun getMaterialPrices(): List<MaterialPriceEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertMaterialPrices(prices: List<MaterialPriceEntity>)
-
-    @Query("SELECT * FROM wall_calculations WHERE projectId = :projectId ORDER BY createdAt DESC")
-    fun getCalculationsByProjectId(projectId: Long): Flow<List<WallCalculationEntity>>
 
     @Query("SELECT COUNT(*) FROM projects")
     suspend fun getProjectCount(): Int

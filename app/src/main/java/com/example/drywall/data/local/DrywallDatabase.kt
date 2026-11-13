@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.drywall.data.local.dao.CalculationDao
+import com.example.drywall.data.local.dao.PriceDao
 import com.example.drywall.data.local.dao.ProjectDao
 import com.example.drywall.data.local.entity.MaterialPriceEntity
 import com.example.drywall.data.local.entity.ProjectEntity
@@ -14,10 +16,6 @@ import com.example.drywall.data.local.entity.WallOpeningEntity
 
 /**
  * Base de datos SQLite local administrada mediante Room para DrywallCalc.
- *
- * Versión 2: agrega los vanos (tabla `wall_openings`), el área neta emplazable y el
- * resultado de pintura por muro. No se usa migración destructiva: una base v1 existente
- * conserva sus obras y muros.
  */
 @Database(
     entities = [
@@ -32,6 +30,8 @@ import com.example.drywall.data.local.entity.WallOpeningEntity
 abstract class DrywallDatabase : RoomDatabase() {
 
     abstract fun projectDao(): ProjectDao
+    abstract fun calculationDao(): CalculationDao
+    abstract fun priceDao(): PriceDao
 
     companion object {
 

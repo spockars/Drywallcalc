@@ -56,7 +56,7 @@ class DrywallProjectAggregationTest {
             .allowMainThreadQueries()
             .build()
         projectDao = database.projectDao()
-        repository = DrywallRepositoryImpl(projectDao)
+        repository = DrywallRepositoryImpl(database)
     }
 
     @After
