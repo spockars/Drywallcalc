@@ -70,6 +70,7 @@ import com.example.drywall.domain.model.WallFaces
 import com.example.drywall.ui.components.OpeningsCard
 import com.example.drywall.ui.components.PaintCard
 import com.example.drywall.ui.viewmodel.DrywallCalculatorViewModel
+import kotlin.math.abs
 
 /**
  * Pantalla de Formulario de Cálculo con Tarjetas Modulares y Acordeones Colapsables.
@@ -366,7 +367,7 @@ fun CalculationFormScreen(
                                             Column {
                                                 Text("3. Especificaciones Técnicas", fontWeight = FontWeight.Bold)
                                                 Text(
-                                                    "${uiState.boardType.displayName} • ${uiState.profileLength.displayName} • Stud ${uiState.profileWidth.displayName} • ${uiState.profileGauge.displayName}",
+                                                    "${uiState.boardTypeFaceA.displayName} • ${uiState.profileLength.displayName} • Stud ${uiState.profileWidth.displayName} • ${uiState.profileGauge.displayName}",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -386,6 +387,7 @@ fun CalculationFormScreen(
                                             faces = uiState.faces,
                                             boardTypeFaceA = uiState.boardTypeFaceA,
                                             boardTypeFaceB = uiState.boardTypeFaceB,
+                                            studSpacingMeters = uiState.studSpacingMeters,
                                             hasInsulation = uiState.hasInsulation,
                                             profileWidth = uiState.profileWidth,
                                             profileGauge = uiState.profileGauge,
@@ -393,6 +395,7 @@ fun CalculationFormScreen(
                                             onFacesChange = viewModel::onFacesChanged,
                                             onBoardTypeFaceAChange = viewModel::onBoardTypeFaceAChanged,
                                             onBoardTypeFaceBChange = viewModel::onBoardTypeFaceBChanged,
+                                            onStudSpacingChange = viewModel::onStudSpacingChanged,
                                             onInsulationToggle = viewModel::onInsulationToggled,
                                             onProfileWidthChange = viewModel::onProfileWidthChanged,
                                             onProfileGaugeChange = viewModel::onProfileGaugeChanged,
@@ -684,6 +687,7 @@ fun TechnicalSpecsCard(
     faces: WallFaces,
     boardTypeFaceA: DrywallBoardType,
     boardTypeFaceB: DrywallBoardType,
+    studSpacingMeters: Double,
     hasInsulation: Boolean,
     profileWidth: ProfileWidth,
     profileGauge: ProfileGauge,
@@ -691,6 +695,7 @@ fun TechnicalSpecsCard(
     onFacesChange: (WallFaces) -> Unit,
     onBoardTypeFaceAChange: (DrywallBoardType) -> Unit,
     onBoardTypeFaceBChange: (DrywallBoardType) -> Unit,
+    onStudSpacingChange: (Double) -> Unit,
     onInsulationToggle: (Boolean) -> Unit,
     onProfileWidthChange: (ProfileWidth) -> Unit,
     onProfileGaugeChange: (ProfileGauge) -> Unit,
@@ -704,6 +709,21 @@ fun TechnicalSpecsCard(
                     selected = faces == f,
                     onClick = { onFacesChange(f) },
                     label = { Text(f.label) }
+                )
+            }
+        }
+
+        Text("Modulación de Parantes (Separación)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                0.305 to "30.5 cm",
+                0.407 to "40.7 cm (Estándar)",
+                0.61 to "61 cm (Comercial)"
+            ).forEach { (spacing, label) ->
+                FilterChip(
+                    selected = abs(studSpacingMeters - spacing) < 0.005,
+                    onClick = { onStudSpacingChange(spacing) },
+                    label = { Text(label) }
                 )
             }
         }
